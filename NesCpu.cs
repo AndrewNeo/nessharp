@@ -2,10 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace NesSharp
 {
-    class NesCpu
+    class NesCpu : IResettable
     {
         public NesCpu(Nes nes)
         {
@@ -13,6 +15,7 @@ namespace NesSharp
             nes.Clock += Update;
 
             CurrentState = new NesCpuState();
+            CacheOpcodes();
         }
 
         protected Nes Nes { get; set; }
@@ -21,44 +24,16 @@ namespace NesSharp
 
         public void Update()
         {
-            RunCycle();
-        }
-
-        private void RunCycle()
-        {
             if (CurrentState.CycleTicksRemain > 0)
             {
                 CurrentState.CycleTicksRemain--;
                 return;
             }
 
-            CurrentState.PC++;
-
             var instruction = Nes.Cart.Rom.ElementAt(CurrentState.PC);
             CurrentState.PC++;
 
-            // https://problemkaputt.de/everynes.htm
-            // TODO: Convert this into a delegate lookup table instead of a switch statement
-            switch (instruction)
-            {
-                case 0x01:
-                case 0x05:
-                case 0x09:
-                case 0x0D:
-                case 0x11:
-                case 0x15:
-                case 0x19:
-                case 0x1D:
-                    var operand = FetchOperandByte(StaticData.OPTCODE_MEMORY[instruction]);
-
-                    operand |= CurrentState.A;
-                    CurrentState.SetStatusFlag(StatusFlags.Negative, (operand > 0x7F));
-                    CurrentState.SetStatusFlag(StatusFlags.Zero, (operand == 0x0));
-                    CurrentState.A = operand;
-
-                    CurrentState.CycleTicksRemain = 1 + StaticData.ADDRESS_EXPENSES[StaticData.OPTCODE_MEMORY[instruction]];
-                    break;
-            }
+            CurrentState.CycleTicksRemain = FUNCTION_LOOKUP[instruction]();
 
             // This was a tick 
             CurrentState.CycleTicksRemain--;
@@ -130,9 +105,145 @@ namespace NesSharp
         {
             return (ushort)((a << 8) + b);
         }
+
+        // Handle opcodes
+
+        /// <summary>Function lookup table</summary>
+        private static Func<byte>[] FUNCTION_LOOKUP = new Func<byte>[0xFF];
+
+        private void CacheOpcodes()
+        {
+            // Get all opcode methods
+            var opcodeMethods = typeof(NesCpu).GetMethods(BindingFlags.NonPublic).Where(w => w.GetCustomAttributes(typeof(OpcodeAttribute), false).Length > 0).Distinct();
+            foreach (var method in opcodeMethods)
+            {
+                var opcodeAttrs = method.GetCustomAttributes(typeof(OpcodeAttribute), false).Cast<OpcodeAttribute>();
+                foreach (var opcodeAttr in opcodeAttrs)
+                {
+                    var opcode = opcodeAttr.Opcode;
+                    var mode = opcodeAttr.Mode;
+                    var cost = opcodeAttr.Cost;
+
+                    Operation del = (Operation)Delegate.CreateDelegate(typeof(Operation), this, method);
+                    Func<byte> call = () =>
+                    {
+                        del.Invoke(mode);
+                        return cost;
+                    };
+
+                    //var entry = new OperationEntry(call);
+                    FUNCTION_LOOKUP[opcode] = call;
+                }
+            }
+        }
+
+        // Opcode definitions
+        // https://problemkaputt.de/everynes.htm
+
+        [Opcode(0xA8, 2)]
+        private void Operation_TAY(AddressingMode mode)
+        {
+            CurrentState.Y = CurrentState.A;
+        }
+
+        [Opcode(0xAA, 2)]
+        private void Operation_TAX(AddressingMode mode)
+        {
+            CurrentState.X = CurrentState.A;
+        }
+
+        [Opcode(0xBA, 2)]
+        private void Operation_TSX(AddressingMode mode)
+        {
+            CurrentState.X = CurrentState.S;
+        }
+
+        [Opcode(0x98, 2)]
+        private void Operation_TYA(AddressingMode mode)
+        {
+            CurrentState.A = CurrentState.Y;
+        }
+
+        [Opcode(0x8A, 2)]
+        private void Operation_TXA(AddressingMode mode)
+        {
+            CurrentState.A = CurrentState.X;
+        }
+
+        [Opcode(0x9A, 2)]
+        private void Operation_TXS(AddressingMode mode)
+        {
+            CurrentState.S = CurrentState.X;
+        }
+
+        [Opcode(0xA9, 2, AddressingMode.ZeroPage)]
+        private void Operation_LDA(AddressingMode mode)
+        {
+            var operand = FetchOperandByte(mode);
+            CurrentState.A = operand;
+        }
+
+        [Opcode(0xA2, 2, AddressingMode.ZeroPage)]
+        private void Operation_LDX(AddressingMode mode)
+        {
+            var operand = FetchOperandByte(mode);
+            CurrentState.X = operand;
+        }
+
+        [Opcode(0x0A, 2, AddressingMode.ZeroPage)]
+        private void Operation_LDY(AddressingMode mode)
+        {
+            var operand = FetchOperandByte(mode);
+            CurrentState.Y = operand;
+        }
+
+        [Opcode(0x01, 6, AddressingMode.IndirectX)]
+        private void Operation_ORA(AddressingMode mode)
+        {
+            var operand = FetchOperandByte(mode);
+
+            operand |= CurrentState.A;
+            CurrentState.SetStatusFlag(StatusFlags.Negative, (operand > 0x7F));
+            CurrentState.SetStatusFlag(StatusFlags.Zero, (operand == 0x0));
+            CurrentState.A = operand;
+        }
     }
 
-    class NesCpuState
+    delegate void Operation(AddressingMode mode);
+
+    /*struct OperationEntry
+    {
+        public OperationEntry(byte opcode, AddressingMode mode, byte cost, Func<byte> call)
+        {
+            this.opcode = opcode;
+            this.mode = mode;
+            this.cost = cost;
+            this.call = call;
+        }
+
+        public byte opcode;
+        public AddressingMode mode;
+        public byte cost;
+        /// <summary>Function that performs the operation and returns the cost</summary>
+        public Func<byte> call;
+    }*/
+
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+    class OpcodeAttribute : Attribute
+    {
+        public OpcodeAttribute(byte opcode, byte cost, AddressingMode mode = AddressingMode.Unsupported)
+        {
+            this.Opcode = opcode;
+            this.Mode = mode;
+            this.Cost = cost;
+        }
+
+        public byte Opcode { get; private set; }
+        public AddressingMode Mode { get; private set; }
+        public byte Cost { get; private set; }
+    }
+
+    class NesCpuState : IResettable
     {
         public NesCpuState()
         {
@@ -190,9 +301,10 @@ namespace NesSharp
         }
     }
 
-    enum AddressingMode
+    enum AddressingMode : int
     {
         Unsupported = 0,
+        /// <summary>XXX #nn</summary>
         Immediate,
         ZeroPage,
         ZeroPageX,
@@ -213,31 +325,5 @@ namespace NesSharp
         Always1 = 0x5,
         Overflow = 0x6,
         Negative = 0x7,
-    }
-
-    internal class StaticData
-    {
-        public readonly static Dictionary<byte, AddressingMode> OPTCODE_MEMORY = new Dictionary<byte, AddressingMode>()
-        {
-            {0x01, AddressingMode.IndirectX},
-            {0x05, AddressingMode.ZeroPage},
-            {0x09, AddressingMode.Immediate},
-            {0x0D, AddressingMode.Absolute},
-            {0x11, AddressingMode.IndirectY},
-            {0x15, AddressingMode.ZeroPageX},
-            {0x19, AddressingMode.AbsoluteY},
-            {0x1D, AddressingMode.AbsoluteX},
-        };
-
-        public readonly static Dictionary<AddressingMode, byte> ADDRESS_EXPENSES = new Dictionary<AddressingMode, byte>() {
-            {AddressingMode.Immediate, 1},
-            {AddressingMode.ZeroPage, 2},
-            {AddressingMode.ZeroPageX, 3},
-            {AddressingMode.Absolute, 3},
-            {AddressingMode.AbsoluteX, 3},
-            {AddressingMode.AbsoluteY, 3},
-            {AddressingMode.IndirectX, 5},
-            {AddressingMode.IndirectY, 4},
-        };
     }
 }

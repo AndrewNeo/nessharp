@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace NesSharp
 {
-    class NesRam
+    class NesRam : IResettable
     {
         public NesRam(Nes nes)
         {
@@ -41,12 +41,14 @@ namespace NesSharp
             mem[osa + 1] = rb[1];
         }
 
+        private byte[] BidirectionalIO { get; set; }
         private byte[] WorkingRam { get; set; }
         private byte[] InternalPpuRegisters { get; set; }
         private byte[] InternalApuRegisters { get; set; }
 
         public void Reset()
         {
+            BidirectionalIO = new byte[2];
             WorkingRam = new byte[2 * 1024];
             InternalPpuRegisters = new byte[8];
             InternalApuRegisters = new byte[18];
@@ -54,7 +56,11 @@ namespace NesSharp
 
         private (byte[], ushort) MapMemory(ushort pos)
         {
-            if (pos >= 0 && pos <= 0x07FF)
+            if (pos >= 0x0000 && pos <= 0x0001)
+            {
+                return (BidirectionalIO, 0);
+            }
+            else if (pos >= 0x0002 && pos <= 0x07FF)
             {
                 return (WorkingRam, 0);
             }
@@ -73,9 +79,13 @@ namespace NesSharp
             else if (pos >= 0x4018 && pos <= 0x5FFF)
             {
                 return (Nes.Cart.ExpansionArea, 0x4018);
-            } else if (pos >= 0x6000 && pos <= 0x7FFF) {
+            }
+            else if (pos >= 0x6000 && pos <= 0x7FFF)
+            {
                 return (Nes.Cart.Sram, 0x6000);
-            } else if (pos >= 0x8000 && pos <= 0xFFFF) {
+            }
+            else if (pos >= 0x8000 && pos <= 0xFFFF)
+            {
                 return (Nes.Cart.Rom, 0x8000);
             }
 
