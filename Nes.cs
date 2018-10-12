@@ -8,14 +8,15 @@ namespace NesSharp
         {
             Cpu = new NesCpu(this);
             Ram = new NesRam(this);
+            Cart = new NesCart();
         }
 
         public event Action Clock;
 
-        public NesCpu Cpu { get; protected set; }
+        public NesCpu Cpu;
 
-        public NesRam Ram { get; protected set; }
+        public NesRam Ram;
 
-        public NesCart Cart { get; protected set; }
+        public NesCart Cart;
     }
 }

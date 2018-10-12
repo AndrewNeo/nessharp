@@ -12,7 +12,7 @@ namespace NesSharp
             Reset();
         }
 
-        private Nes Nes { get; set; }
+        private Nes Nes;
 
         public byte ReadByte(ushort i)
         {
@@ -41,10 +41,10 @@ namespace NesSharp
             mem[osa + 1] = rb[1];
         }
 
-        private byte[] BidirectionalIO { get; set; }
-        private byte[] WorkingRam { get; set; }
-        private byte[] InternalPpuRegisters { get; set; }
-        private byte[] InternalApuRegisters { get; set; }
+        private byte[] BidirectionalIO;
+        private byte[] WorkingRam;
+        private byte[] InternalPpuRegisters;
+        private byte[] InternalApuRegisters;
 
         public void Reset()
         {
@@ -75,6 +75,10 @@ namespace NesSharp
             else if (pos >= 0x2008 && pos <= 0x3FFF)
             { // mirrored? how exactly. divide to find range somehow?
                 return (InternalPpuRegisters, 0x2008);
+            }
+            else if (pos >= 0x4000 && pos <= 0x4017)
+            {
+                return (InternalApuRegisters, 0x4000);
             }
             else if (pos >= 0x4018 && pos <= 0x5FFF)
             {
