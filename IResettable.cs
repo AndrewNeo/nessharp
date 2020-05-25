@@ -2,6 +2,7 @@ namespace NesSharp
 {
     interface IResettable
     {
-        void Reset();
+        void SoftReset();
+        void HardReset();
     }
 }

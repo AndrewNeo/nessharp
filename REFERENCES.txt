@@ -1,0 +1,8 @@
+Reference material for implementation
+
+https://problemkaputt.de/everynes.htm
+http://www.thealmightyguru.com/Games/Hacking/Wiki/index.php?title=6502_Opcodes
+http://www.obelisk.me.uk/6502/reference.html
+https://wiki.nesdev.com/w/index.php/CPU_unofficial_opcodes
+http://rubbermallet.org/fake6502.c
+https://github.com/AndreaOrru/LaiNES/blob/master/src/cpu.cpp

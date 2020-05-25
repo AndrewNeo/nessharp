@@ -1,0 +1,20 @@
+New memory bus mapping systems for both CPU and PPU
+
+CpuMemoryBus
+ |
+ |-- Mapper
+ |
+ |--------------- PPU registers
+ |--------------- APU registers
+ |
+ |-- CpuMemory
+
+Master memory manager with read8/16 and write functions
+Should be as generic as possible for CPU and PPU if we can
+Mapper informs it where it maps to in this range, if hit call that
+CPU should also be bound to call PPU and APU registers
+ \- These call the PPU/APU read/write functions, not directly mapping!
+    They're memory-mapped registers on the system, not in CPU or RAM.
+Finally call CPU for memory
+If the range isn't instanced, return a 3-bit open bus with offset set to pos
+ \- This way we can be at position 1 and write 2 bytes safely
