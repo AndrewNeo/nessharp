@@ -4,7 +4,7 @@ namespace NesSharp.Memory
 {
     public abstract class NesMemory : IMemoryAccess
     {
-        protected byte[] OpenBus = new byte[3];
+        protected readonly byte[] OpenBus = new byte[3];
 
         public byte ReadByte(ushort address)
         {

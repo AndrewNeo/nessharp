@@ -1,5 +1,6 @@
 using System;
 using NesSharp.Memory;
+using NesSharp.PPU;
 using NesSharp.Utils;
 
 namespace NesSharp.Cart.Mappers
@@ -16,9 +17,9 @@ namespace NesSharp.Cart.Mappers
             Registers = new byte[8];
         }
 
-        private byte[] OpenBus;
-        private byte[] PrgRam;
-        private byte[] Registers;
+        private readonly byte[] OpenBus;
+        private readonly byte[] PrgRam;
+        private readonly byte[] Registers;
 
         private byte NextWriteBank;
         private bool PrgRomBankMode;
@@ -39,7 +40,7 @@ namespace NesSharp.Cart.Mappers
             }
         }
 
-        protected new bool WriteRegister(ushort i, byte d)
+        protected override bool WriteRegister(ushort i, byte d)
         {
             if (i < 0x8000)
             {
@@ -71,7 +72,7 @@ namespace NesSharp.Cart.Mappers
                 case 0xA000:
                     // Mirroring
                     NametableMirroring = bits[0];
-                    // TODO: Tell the PPU
+                    Nes.Ppu.MirrorMode = NametableMirroring ? MirrorMode.Horizontal : MirrorMode.Vertical;
                     return true;
                 case 0xA001:
                     // PRG RAM protect
@@ -100,7 +101,24 @@ namespace NesSharp.Cart.Mappers
             return false;
         }
 
-        protected new MemoryMapResponse MapCpuMemory(ushort pos)
+        public override void Scanline()
+        {
+            if (IRQCounter == 0)
+            {
+                IRQCounter = IRQPeriod;
+            }
+            else
+            {
+                IRQCounter--;
+            }
+
+            if (IRQEnabled && IRQCounter == 0)
+            {
+                this.Nes.Cpu.ActiveIrq = true;
+            }
+        }
+
+        protected override MemoryMapResponse MapCpuMemory(ushort pos)
         {
             if (pos >= 0x6000 && pos <= 0x7FFF)
             {
@@ -159,7 +177,7 @@ namespace NesSharp.Cart.Mappers
             return this.Nes.Cart.PrgRom.AsSpan(page * NesConsts.PrgPageSize, NesConsts.PrgPageSize);
         }
 
-        protected new MemoryMapResponse MapPpuMemory(ushort pos)
+        protected override MemoryMapResponse MapPpuMemory(ushort pos)
         {
             if (pos >= 0x0000 && pos <= 0x07FF)
             {
@@ -240,23 +258,6 @@ namespace NesSharp.Cart.Mappers
         private Span<byte> GetChrRomBank(byte page, byte size)
         {
             return this.Nes.Cart.ChrRom.AsSpan(page * NesConsts.ChrPageSize * size, NesConsts.ChrPageSize * size);
-        }
-
-        public new void Scanline()
-        {
-            if (IRQCounter == 0)
-            {
-                IRQCounter = IRQPeriod;
-            }
-            else
-            {
-                IRQCounter--;
-            }
-
-            if (IRQEnabled && IRQCounter == 0)
-            {
-                this.Nes.Cpu.ActiveIrq = true;
-            }
         }
     }
 }

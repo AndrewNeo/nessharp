@@ -21,7 +21,7 @@ namespace NesSharp.CPU
             else if (address >= 0x2000 && address <= 0x3FFF)
             {
                 // 0x2000-0x2007 are mirrored every 8 bytes
-                ushort offset = (ushort)(address + (0x2000 % 8));
+                ushort offset = (ushort)(address % 8);
                 return Nes.Ppu.Read(offset);
             }
             else if (address >= 0x4000 && address <= 0x4017)
@@ -44,9 +44,13 @@ namespace NesSharp.CPU
             {
                 throw new IllegalMemoryAccessException(AddressBus.CPU, address, "Attempted to read 16 bits from PPU registers");
             }
-            else if (address >= 0x4000 && address <= 0x4017)
+            else if (address >= 0x4000 && address <= 0x4013)
             {
                 throw new IllegalMemoryAccessException(AddressBus.CPU, address, "Attempted to read 16 bits from APU registers");
+            }
+            else if (address >= 0x4014 && address <= 0x4017)
+            {
+                throw new Exception("DMA not yet implemented");
             }
             else
             {
@@ -63,13 +67,16 @@ namespace NesSharp.CPU
             else if (address >= 0x2000 && address <= 0x3FFF)
             {
                 // 0x2000-0x2007 are mirrored every 8 bytes
-                ushort offset = (ushort)(address + (0x2000 % 8));
-                //return new MemoryMapResponse(Nes.Ppu.Registers, offset, true);
+                ushort offset = (ushort)(address % 8);
                 Nes.Ppu.Write(offset, value);
             }
-            else if (address >= 0x4000 && address <= 0x4017)
+            else if (address >= 0x4000 && address <= 0x4013)
             {
                 throw new Exception("APU not yet implemented");
+            }
+            else if (address >= 0x4014 && address <= 0x4017)
+            {
+                throw new Exception("DMA not yet implemented");
             }
             else
             {

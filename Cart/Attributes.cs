@@ -19,7 +19,9 @@ namespace NesSharp.Cart
     {
         public MemoryMapAttribute(AddressBus bus, ushort start, ushort end)
         {
-
+            this.Bus = bus;
+            this.Start = start;
+            this.End = end;
         }
 
         public AddressBus Bus { get; private set; }

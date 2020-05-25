@@ -22,6 +22,8 @@ namespace NesSharp.Cart
             }
         }
 
+        protected Nes Nes;
+
         protected NesCartMapper(Nes nes)
         {
             this.Nes = nes;
@@ -32,7 +34,23 @@ namespace NesSharp.Cart
             PPUEndRange = GetMemoryMapAttribute(AddressBus.PPU).End;
         }
 
-        protected Nes Nes;
+        // Mapper handling range definitions
+
+        private MemoryMapAttribute GetMemoryMapAttribute(AddressBus bus)
+        {
+            var attrs = this.GetType().GetCustomAttributes(typeof(MemoryMapAttribute), true).Cast<MemoryMapAttribute>();
+            return attrs.First(a => a.Bus == bus);
+        }
+
+        public ushort CPUStartRange { get; private set; }
+
+        public ushort CPUEndRange { get; private set; }
+
+        public ushort PPUStartRange { get; private set; }
+
+        public ushort PPUEndRange { get; private set; }
+
+        // I/O
 
         public byte CpuReadByte(ushort i)
         {
@@ -79,28 +97,16 @@ namespace NesSharp.Cart
             mmr.Write(i, d);
         }
 
-        protected bool WriteRegister(ushort i, byte d)
+        // Overrides
+
+        protected virtual bool WriteRegister(ushort i, byte d)
         {
             return false;
         }
 
-        public void Scanline() { }
+        public virtual void Scanline() { }
 
-        private MemoryMapAttribute GetMemoryMapAttribute(AddressBus bus)
-        {
-            var attrs = this.GetType().GetCustomAttributes(typeof(MemoryMapAttribute), true).Cast<MemoryMapAttribute>();
-            return attrs.First(a => a.Bus == bus);
-        }
-
-        public ushort CPUStartRange { get; private set; }
-
-        public ushort CPUEndRange { get; private set; }
-
-        public ushort PPUStartRange { get; private set; }
-
-        public ushort PPUEndRange { get; private set; }
-
-        protected MemoryMapResponse MapCpuMemory(ushort pos)
+        protected virtual MemoryMapResponse MapCpuMemory(ushort pos)
         {
             if (pos >= 0x4020 && pos <= 0x5FFF)
             {
@@ -110,7 +116,7 @@ namespace NesSharp.Cart
             throw new UnderhandledMemoryException(AddressBus.CPU, pos);
         }
 
-        protected MemoryMapResponse MapPpuMemory(ushort pos)
+        protected virtual MemoryMapResponse MapPpuMemory(ushort pos)
         {
             throw new UnderhandledMemoryException(AddressBus.PPU, pos);
         }

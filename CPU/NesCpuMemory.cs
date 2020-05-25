@@ -6,14 +6,15 @@ namespace NesSharp.CPU
 {
     public class NesCpuMemory : NesMemory, IResettable
     {
-        public NesCpuMemory(Nes nes)
-        {
-            this.Nes = nes;
-        }
+        private readonly byte[] BidirectionalIO;
+        private readonly byte[] WorkingRam;
 
-        private Nes Nes;
-        private byte[] BidirectionalIO;
-        private byte[] WorkingRam;
+
+        public NesCpuMemory()
+        {
+            BidirectionalIO = new byte[2];
+            WorkingRam = new byte[2 * 1024];
+        }
 
         public void SoftReset()
         {
@@ -21,8 +22,8 @@ namespace NesSharp.CPU
 
         public void HardReset()
         {
-            BidirectionalIO = new byte[2];
-            WorkingRam = new byte[2 * 1024];
+            FastBits.Clear(BidirectionalIO);
+            FastBits.Clear(WorkingRam);
         }
 
         protected override MemoryMapResponse MapMemory(ushort address)

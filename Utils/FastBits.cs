@@ -42,5 +42,15 @@ namespace NesSharp.Utils
                 (bits[7] ? 0x80 : 0x0)
             );
         }
+
+        public static void Clear(byte[] b)
+        {
+            Array.Clear(b, 0, b.Length);
+        }
+
+        public static void Clear(uint[] b)
+        {
+            Array.Clear(b, 0, b.Length);
+        }
     }
 }

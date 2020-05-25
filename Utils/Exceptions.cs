@@ -25,4 +25,9 @@ namespace NesSharp
         public AddressBus Bus { get; private set; }
         public ushort Address { get; private set; }
     }
+
+    public class RomFormatException : Exception
+    {
+        public RomFormatException(string message) : base(message) { }
+    }
 }

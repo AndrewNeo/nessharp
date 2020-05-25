@@ -1,6 +1,7 @@
 using System;
 using NesSharp.Cart;
 using NesSharp.CPU;
+using NesSharp.GUI;
 using NesSharp.Memory;
 using NesSharp.PPU;
 
@@ -13,6 +14,7 @@ namespace NesSharp
             Cpu = new NesCpu(this);
             Ppu = new NesPpu(this);
             Debugger = new NesDebugger(this);
+            Gui = new GuiInterface(this);
         }
 
         public NesCpu Cpu { get; private set; }
@@ -22,6 +24,13 @@ namespace NesSharp
         public NesCart Cart { get; private set; }
 
         public NesDebugger Debugger { get; private set; }
+
+        public GuiInterface Gui { get; private set; }
+
+        public void InitGui()
+        {
+            Gui.Init();
+        }
 
         public void LoadCartFromFile(string filename)
         {
