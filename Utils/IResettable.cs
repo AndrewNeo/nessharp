@@ -1,4 +1,6 @@
-namespace NesSharp
+using System;
+
+namespace NesSharp.Utils
 {
     interface IResettable
     {

@@ -1,20 +1,17 @@
 using System;
-using NesSharp.Mappers;
+using System.Linq;
+using NesSharp.Cart.Mappers;
+using NesSharp.Memory;
 
-namespace NesSharp
+namespace NesSharp.Cart
 {
     public abstract class NesCartMapper
     {
-        protected NesCartMapper(Nes nes)
-        {
-            this.Nes = nes;
-        }
-
-        protected Nes Nes;
-
         public static NesCartMapper Build(Nes nes, NesCartHeader header)
         {
             var mapper = header.MapperNumber;
+
+            // TODO: Convert this to look up mapper by MapperAttribute
             if (mapper == 4)
             {
                 return new Mapper4(nes);
@@ -24,6 +21,18 @@ namespace NesSharp
                 throw new UnsupportedMapperException(mapper);
             }
         }
+
+        protected NesCartMapper(Nes nes)
+        {
+            this.Nes = nes;
+
+            CPUStartRange = GetMemoryMapAttribute(AddressBus.CPU).Start;
+            CPUEndRange = GetMemoryMapAttribute(AddressBus.CPU).End;
+            PPUStartRange = GetMemoryMapAttribute(AddressBus.PPU).Start;
+            PPUEndRange = GetMemoryMapAttribute(AddressBus.PPU).End;
+        }
+
+        protected Nes Nes;
 
         public byte CpuReadByte(ushort i)
         {
@@ -36,7 +45,7 @@ namespace NesSharp
         {
             Nes.Debugger.Log(NesDebugger.TAG_MAP, "CPU reading ushort from {0:x}", i);
             var mmr = MapCpuMemory(i);
-            return mmr.ReadUShort(i);
+            return mmr.ReadAddress(i);
         }
 
         public void CpuWrite(ushort i, byte d)
@@ -60,7 +69,7 @@ namespace NesSharp
         {
             Nes.Debugger.Log(NesDebugger.TAG_MAP, "PPU reading ushort from {0:x}", i);
             var mmr = MapPpuMemory(i);
-            return mmr.ReadUShort(i);
+            return mmr.ReadAddress(i);
         }
 
         public void PpuWrite(ushort i, byte d)
@@ -77,6 +86,20 @@ namespace NesSharp
 
         public void Scanline() { }
 
+        private MemoryMapAttribute GetMemoryMapAttribute(AddressBus bus)
+        {
+            var attrs = this.GetType().GetCustomAttributes(typeof(MemoryMapAttribute), true).Cast<MemoryMapAttribute>();
+            return attrs.First(a => a.Bus == bus);
+        }
+
+        public ushort CPUStartRange { get; private set; }
+
+        public ushort CPUEndRange { get; private set; }
+
+        public ushort PPUStartRange { get; private set; }
+
+        public ushort PPUEndRange { get; private set; }
+
         protected MemoryMapResponse MapCpuMemory(ushort pos)
         {
             if (pos >= 0x4020 && pos <= 0x5FFF)
@@ -84,14 +107,13 @@ namespace NesSharp
                 return new MemoryMapResponse(Nes.Cart.ExpansionArea, 0x4000, true);
             }
 
-            throw new Exception(String.Format("Unhandled CPU memory access at 0x{0:x}", pos));
+            throw new UnderhandledMemoryException(AddressBus.CPU, pos);
         }
 
         protected MemoryMapResponse MapPpuMemory(ushort pos)
         {
-            throw new Exception(String.Format("Unhandled PPU memory access at 0x{0:x}", pos));
+            throw new UnderhandledMemoryException(AddressBus.PPU, pos);
         }
-
     }
 
     public class UnsupportedMapperException : Exception

@@ -1,15 +1,22 @@
 using System;
+using NesSharp.Memory;
+using NesSharp.Utils;
 
-namespace NesSharp.Mappers
+namespace NesSharp.Cart.Mappers
 {
+    [Mapper(4)]
+    [MemoryMap(AddressBus.CPU, 0x6000, 0xFFFF)]
+    [MemoryMap(AddressBus.PPU, 0x0000, 0x4000)]
     class Mapper4 : NesCartMapper
     {
         public Mapper4(Nes nes) : base(nes)
         {
+            OpenBus = new byte[3];
             PrgRam = new byte[8 * 1024];
             Registers = new byte[8];
         }
 
+        private byte[] OpenBus;
         private byte[] PrgRam;
         private byte[] Registers;
 
@@ -105,7 +112,7 @@ namespace NesSharp.Mappers
                 else
                 {
                     // open bus
-                    return new MemoryMapResponse(new byte[NesConsts.PrgPageSize], 0x6000, false);
+                    return new MemoryMapResponse(OpenBus, 0x6000, false);
                 }
             }
             else if (pos >= 0x8000 && pos <= 0x9FFF)

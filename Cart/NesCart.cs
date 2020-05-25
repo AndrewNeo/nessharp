@@ -1,8 +1,8 @@
 using System;
-using System.Collections;
 using System.Linq;
+using NesSharp.Utils;
 
-namespace NesSharp
+namespace NesSharp.Cart
 {
     public static class NesCartBuilder
     {

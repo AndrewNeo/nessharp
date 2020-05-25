@@ -1,7 +1,6 @@
 using System;
-using System.Collections.Generic;
 
-namespace NesSharp
+namespace NesSharp.Utils
 {
     public static class FastBits
     {

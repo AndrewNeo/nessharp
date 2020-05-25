@@ -1,10 +1,13 @@
 using System;
+using NesSharp.Utils;
 
-namespace NesSharp
+namespace NesSharp.PPU
 {
     public class NesPpu : IResettable
     {
         protected Nes Nes;
+        private NesPpuAddressBus Bus;
+        public NesPpuMemory Memory { get; private set; }
         private uint[] imageBuffer;
         private ushort currentScanline;
         private ushort currentDot;
@@ -13,6 +16,8 @@ namespace NesSharp
         public NesPpu(Nes nes)
         {
             this.Nes = nes;
+            this.Bus = new NesPpuAddressBus(nes);
+            this.Memory = new NesPpuMemory();
         }
 
         public void Update()
@@ -80,6 +85,26 @@ namespace NesSharp
 
         private byte StatusRegister { get { return Registers[2]; } }
 
+        public byte Read(ushort address)
+        {
+            if (address > 8)
+            {
+                throw new Exception("Tried reading out of range from PPU");
+            }
+
+            return Registers[address];
+        }
+
+        public void Write(ushort address, byte value)
+        {
+            if (address > 8)
+            {
+                throw new Exception("Tried reading out of range from PPU");
+            }
+
+            Registers[address] = value;
+        }
+
         // Convienience flags
 
         private bool Rendering { get { return Mask.ShowBackground || Mask.ShowSprites; } }
@@ -125,14 +150,14 @@ namespace NesSharp
             Registers[1] = 0x0;
             Registers[2] = 0x0;
 
-            Nes.PpuMem.SoftReset();
+            Memory.SoftReset();
         }
 
         public void HardReset()
         {
             Registers = new byte[8];
 
-            Nes.PpuMem.HardReset();
+            Memory.HardReset();
 
             isFrameOdd = false;
             currentScanline = 0;

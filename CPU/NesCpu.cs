@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using NesSharp.Utils;
 
-namespace NesSharp
+namespace NesSharp.CPU
 {
     public class NesCpu : IResettable
     {
@@ -26,13 +27,17 @@ namespace NesSharp
 
         protected Nes Nes;
 
-        private NesCpuState CurrentState;
+        private NesCpuAddressBus Bus;
+        public NesCpuMemory Memory { get; private set; }
 
+        private NesCpuState CurrentState;
         private byte currentCycleCost;
 
         public NesCpu(Nes nes)
         {
             this.Nes = nes;
+            this.Bus = new NesCpuAddressBus(nes);
+            this.Memory = new NesCpuMemory(nes);
 
             CacheOpcodes();
 
@@ -64,7 +69,7 @@ namespace NesSharp
                 return true;
             }
 
-            var instruction = Nes.CpuMem.ReadByte(CurrentState.PC);
+            var instruction = Bus.ReadByte(CurrentState.PC);
             Nes.Debugger.ExecOpCode(instruction);
             CurrentState.PC++;
 
@@ -109,7 +114,7 @@ namespace NesSharp
         {
             Nes.Debugger.Log(NesDebugger.TAG_CPU, "Soft-resetting CPU");
             CurrentState.SoftReset();
-            Nes.CpuMem.SoftReset();
+            Memory.SoftReset();
             Reset();
         }
 
@@ -117,7 +122,7 @@ namespace NesSharp
         {
             Nes.Debugger.Log(NesDebugger.TAG_CPU, "Hard-resetting CPU");
             CurrentState.HardReset();
-            Nes.CpuMem.HardReset();
+            Memory.HardReset();
             Reset();
         }
 
@@ -130,7 +135,7 @@ namespace NesSharp
 
         private void JumpWithVectorTable(FixedJumpVector fjv)
         {
-            var jumpVector = Nes.CpuMem.ReadUShort((ushort)fjv);
+            var jumpVector = Bus.ReadAddress((ushort)fjv);
             CurrentState.PC = jumpVector;
 
             Nes.Debugger.Log(NesDebugger.TAG_CPU, "Set jump vector to {0:x}", jumpVector);
@@ -197,8 +202,8 @@ namespace NesSharp
                     temp = ReadUshortAtPC();
 
                     // Zero page wraparound
-                    var ixi_a = Nes.CpuMem.ReadByte((ushort)(temp & 0x00FF));
-                    var ixi_b = Nes.CpuMem.ReadByte((ushort)((temp + 1) & 0x00FF));
+                    var ixi_a = Bus.ReadByte((ushort)(temp & 0x00FF));
+                    var ixi_b = Bus.ReadByte((ushort)((temp + 1) & 0x00FF));
 
                     addr = (ushort)(ixi_a | (ixi_b << 8));
                     break;
@@ -208,8 +213,8 @@ namespace NesSharp
                     // Zero page wraparound
                     temp2 = (ushort)((temp + CurrentState.X) & 0x00FF);
 
-                    var ixx_a = Nes.CpuMem.ReadByte((ushort)(temp2 & 0x00FF));
-                    var ixx_b = Nes.CpuMem.ReadByte((ushort)((temp2 + 1) & 0x00FF));
+                    var ixx_a = Bus.ReadByte((ushort)(temp2 & 0x00FF));
+                    var ixx_b = Bus.ReadByte((ushort)((temp2 + 1) & 0x00FF));
 
                     addr = (ushort)(ixx_a | (ixx_b << 8));
                     break;
@@ -219,8 +224,8 @@ namespace NesSharp
                     // Zero page wraparound
                     temp2 = (ushort)((temp & 0xFF00) | ((temp + 1) & 0x00FF));
 
-                    var ixy_a = Nes.CpuMem.ReadByte(temp);
-                    var ixy_b = Nes.CpuMem.ReadByte(temp2);
+                    var ixy_a = Bus.ReadByte(temp);
+                    var ixy_b = Bus.ReadByte(temp2);
                     var ixy_r = (ushort)(ixy_a | (ixy_b << 8));
 
                     addr = (ushort)(ixy_r + CurrentState.Y);
@@ -240,7 +245,7 @@ namespace NesSharp
         private byte FetchOperandByte(AddressingMode mode, bool isWrite = false)
         {
             var address = FetchOperandAddress(mode, isWrite);
-            return Nes.CpuMem.ReadByte(address);
+            return Bus.ReadByte(address);
         }
 
         private bool IsCrossingPageBoundry(ushort address, ushort i)
@@ -250,14 +255,14 @@ namespace NesSharp
 
         private byte ReadByteAtPC()
         {
-            var value = Nes.CpuMem.ReadByte(CurrentState.PC);
+            var value = Bus.ReadByte(CurrentState.PC);
             CurrentState.PC++;
             return value;
         }
 
         private ushort ReadUshortAtPC()
         {
-            var value = Nes.CpuMem.ReadUShort(CurrentState.PC);
+            var value = Bus.ReadAddress(CurrentState.PC);
             CurrentState.PC += 2;
             return value;
         }
@@ -273,7 +278,7 @@ namespace NesSharp
         private void StackPush(byte value)
         {
             var address = (ushort)(NesConsts.MEM_STACK_START + CurrentState.S--);
-            Nes.CpuMem.Write(address, value);
+            Bus.Write(address, value);
         }
 
         private void StackPush(ushort value)
@@ -285,7 +290,7 @@ namespace NesSharp
         private byte StackPull()
         {
             var address = (ushort)(NesConsts.MEM_STACK_START + ++CurrentState.S);
-            return Nes.CpuMem.ReadByte(address);
+            return Bus.ReadByte(address);
         }
 
         private ushort StackPull16()
@@ -440,7 +445,7 @@ namespace NesSharp
         private void Operation_STA(AddressingMode mode)
         {
             var address = FetchOperandAddress(mode, true);
-            Nes.CpuMem.Write(address, CurrentState.A);
+            Bus.Write(address, CurrentState.A);
         }
 
         [Opcode(0x86, "STX", 3, AddressingMode.ZeroPage)]
@@ -449,7 +454,7 @@ namespace NesSharp
         private void Operation_STX(AddressingMode mode)
         {
             var address = FetchOperandAddress(mode, true);
-            Nes.CpuMem.Write(address, CurrentState.X);
+            Bus.Write(address, CurrentState.X);
         }
 
         [Opcode(0x84, "STY", 3, AddressingMode.ZeroPage)]
@@ -458,7 +463,7 @@ namespace NesSharp
         private void Operation_STY(AddressingMode mode)
         {
             var address = FetchOperandAddress(mode, true);
-            Nes.CpuMem.Write(address, CurrentState.Y);
+            Bus.Write(address, CurrentState.Y);
         }
 
         #endregion

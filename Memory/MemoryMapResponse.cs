@@ -1,15 +1,7 @@
 using System;
 
-namespace NesSharp
-{
-    public static class NesConsts
-    {
-        public const ushort PrgPageSize = 8 * 1024;
-        public const ushort ChrPageSize = 1 * 1024;
-        public const ushort MEM_STACK_START = 0x100;
-        public const ushort IMAGE_BUFFER_SIZE = 256 * 240;
-    }
-
+namespace NesSharp.Memory
+{    
     public ref struct MemoryMapResponse
     {
         public MemoryMapResponse(byte[] memory, ushort offset, bool writable = false) : this(memory.AsSpan(), offset, writable) { }
@@ -24,21 +16,21 @@ namespace NesSharp
         ushort offset;
         bool writable;
 
-        public byte ReadByte(ushort i)
+        public byte ReadByte(ushort address)
         {
-            return memory[i - offset];
+            return memory[address - offset];
         }
 
-        public ushort ReadUShort(ushort i)
+        public ushort ReadAddress(ushort address)
         {
-            return BitConverter.ToUInt16(memory.Slice(i - offset, 2));
+            return BitConverter.ToUInt16(memory.Slice(address - offset, 2));
         }
 
-        public void Write(ushort i, byte d)
+        public void Write(ushort address, byte value)
         {
             if (writable)
             {
-                memory[i - offset] = d;
+                memory[address - offset] = value;
             }
         }
 

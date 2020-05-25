@@ -1,4 +1,8 @@
 using System;
+using NesSharp.Cart;
+using NesSharp.CPU;
+using NesSharp.Memory;
+using NesSharp.PPU;
 
 namespace NesSharp
 {
@@ -8,21 +12,12 @@ namespace NesSharp
         {
             Cpu = new NesCpu(this);
             Ppu = new NesPpu(this);
-            SharedMem = new NesSharedMemory();
-            CpuMem = new NesCpuMemory(this);
-            PpuMem = new NesPpuMemory(this);
             Debugger = new NesDebugger(this);
         }
 
         public NesCpu Cpu { get; private set; }
 
         public NesPpu Ppu { get; private set; }
-
-        public NesSharedMemory SharedMem { get; private set; }
-
-        public NesCpuMemory CpuMem { get; private set; }
-
-        public NesPpuMemory PpuMem { get; private set; }
 
         public NesCart Cart { get; private set; }
 
@@ -40,7 +35,6 @@ namespace NesSharp
                 throw new Exception("No cart loaded");
             }
 
-            this.SharedMem.HardReset();
             this.Cpu.HardReset();
             this.Ppu.HardReset();
 

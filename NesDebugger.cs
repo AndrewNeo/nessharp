@@ -1,6 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using NesSharp.CPU;
+using NesSharp.Memory;
 
 namespace NesSharp
 {
