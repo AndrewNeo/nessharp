@@ -7,9 +7,9 @@ namespace NesSharp.PPU
     public class NesPpu : IResettable
     {
         protected readonly Nes Nes;
-        private readonly NesPpuAddressBus Bus;
-        public readonly NesPpuMemory Memory;
-        public event ImageFrame NewImageBufferFrame;
+        public readonly NesPpuAddressBus Bus;
+        internal readonly NesPpuMemory Memory;
+        internal event ImageFrame NewImageBufferFrame;
 
         private readonly byte[] Registers;
         private readonly uint[] ImageBuffer;
@@ -19,7 +19,7 @@ namespace NesSharp.PPU
         {
             this.Nes = nes;
             this.Bus = new NesPpuAddressBus(nes);
-            this.Memory = new NesPpuMemory(this);
+            this.Memory = new NesPpuMemory(nes);
 
             this.Registers = new byte[8];
             this.ImageBuffer = new uint[NesConsts.IMAGE_BUFFER_SIZE];

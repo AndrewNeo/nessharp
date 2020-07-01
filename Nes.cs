@@ -1,14 +1,21 @@
 using System;
+using System.Diagnostics;
+using System.Threading;
 using NesSharp.Cart;
 using NesSharp.CPU;
+using NesSharp.Debugger;
 using NesSharp.GUI;
-using NesSharp.Memory;
 using NesSharp.PPU;
+using NesSharp.Utils;
 
 namespace NesSharp
 {
-    public class Nes
+    public class Nes : IResettable, IDisposable
     {
+
+
+        private Thread CpuThread;
+
         public Nes()
         {
             Cpu = new NesCpu(this);
@@ -17,15 +24,18 @@ namespace NesSharp
             Gui = new GuiInterface(this);
         }
 
-        public NesCpu Cpu { get; private set; }
+        public readonly NesCpu Cpu;
 
-        public NesPpu Ppu { get; private set; }
+        public readonly NesPpu Ppu;
 
         public NesCart Cart { get; private set; }
 
-        public NesDebugger Debugger { get; private set; }
+        public readonly NesDebugger Debugger;
 
-        public GuiInterface Gui { get; private set; }
+        public readonly GuiInterface Gui;
+
+        public bool IsPaused { get; set; }
+        public bool IsStartingShutdown { get; set; }
 
         public void InitGui()
         {
@@ -34,37 +44,92 @@ namespace NesSharp
 
         public void LoadCartFromFile(string filename)
         {
-            this.Cart = NesCartBuilder.LoadFromFile(this, filename);
+            Cart = NesCartBuilder.LoadFromFile(this, filename);
         }
 
-        public void Start()
+        public void Start(ushort overrideEntryPoint = 0x0, bool step = false, bool failOnInvalidOpcode = false)
         {
+            this.Debugger.StepMode = step;
+            this.Debugger.FailOnInvalidOpcode = failOnInvalidOpcode;
+
+            this.Debugger.ConsoleView.Start();
+
             if (Cart.Header.FileId == null)
             {
                 throw new Exception("No cart loaded");
             }
 
-            this.Cpu.HardReset();
-            this.Ppu.HardReset();
-
-            // Temporarily just run this far for now
-            var i = 0;
-            while (i < 50000)
+            if (overrideEntryPoint > 0)
             {
-                if (!Clock())
-                {
-                    break;
-                }
-                i++;
+                Cpu.Debug_SetEntryPoint(overrideEntryPoint);
             }
+
+            HardReset();
+
+            CpuThread = new Thread(new ThreadStart(Spin));
+
+            CpuThread.Start();
+            Gui.Spin();
         }
 
-        private bool Clock()
+        public void SoftReset()
         {
-            this.Ppu.Update();
-            this.Ppu.Update();
-            this.Ppu.Update();
-            return this.Cpu.Update();
+            // Not yet supported
+        }
+
+        public void HardReset()
+        {
+            Cpu.HardReset();
+            Ppu.HardReset();
+        }
+
+        public void Quit()
+        {
+            Debugger.Log(NesDebugger.TAG_SYS, "Shutdown requested");
+            IsStartingShutdown = true;
+        }
+
+        public void Dispose()
+        {
+            Gui.Dispose();
+        }
+
+        private void Spin()
+        {
+            Debugger.Log(NesDebugger.TAG_SYS, "Starting system clock");
+            var clock = Stopwatch.StartNew();
+
+            while (!IsStartingShutdown)
+            {
+                if (!IsPaused)
+                {
+                    this.Ppu.Update();
+                    this.Ppu.Update();
+                    this.Ppu.Update();
+                    if (!this.Cpu.Update())
+                    {
+                        if (this.Debugger.FailOnInvalidOpcode)
+                        {
+                            throw new Exception("CPU encountered invalid opcode");
+                        }
+
+                        Debugger.Log(NesDebugger.TAG_SYS, "CPU encountered invalid opcode");
+                        break;
+                    }
+                }
+
+                this.Debugger.ConsoleView.Tick();
+
+                if (IsStartingShutdown) { break; }
+
+                if (clock.ElapsedMilliseconds < NesConsts.FRAME_DELAY_MS)
+                {
+                    Thread.Sleep((int)(NesConsts.FRAME_DELAY_MS - clock.ElapsedMilliseconds));
+                }
+                clock.Restart();
+            }
+
+            Debugger.Log(NesDebugger.TAG_SYS, "System clock loop finished");
         }
     }
 }

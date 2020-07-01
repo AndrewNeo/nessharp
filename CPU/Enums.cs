@@ -1,11 +1,10 @@
 using System;
 using System.Collections;
 using System.Runtime.CompilerServices;
-using NesSharp.Utils;
 
 namespace NesSharp.CPU
 {
-    struct NesCpuState : IResettable
+    public struct NesCpuState : IResettable
     {
         /// <summary>Number of ticks remaining before next operation</summary>
         public int CycleTicksRemain;
@@ -122,7 +121,7 @@ namespace NesSharp.CPU
         Negative = 0x80,
     }
 
-    enum StatusFlags : int
+    public enum StatusFlags : int
     {
         /// <summary>C flag - 0=no carry, 1=carry</summary>
         Carry = 0,

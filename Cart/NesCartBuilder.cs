@@ -29,6 +29,7 @@ namespace NesSharp.Cart
             var chrRom = fileContents.AsSpan(position, chrRomSize);
 
             return new NesCart(
+                System.IO.Path.GetFileName(filename),
                 header,
                 prgRom.ToArray(),
                 chrRom.ToArray(),
@@ -42,10 +43,10 @@ namespace NesSharp.Cart
             var fileId = rom.Slice(0, 4).ToArray();
             if (!fileId.SequenceEqual(INES_FORMAT))
             {
-                throw new RomFormatException(String.Format("Unsupported ROM type: 0x{0:X}{1:X}{2:X}{3:X}", fileId[0], fileId[1], fileId[2], fileId[3]));
+                throw new RomFormatException(String.Format("Unsupported ROM type: {0:X}{1:X}{2:X}{3:X}", fileId[0], fileId[1], fileId[2], fileId[3]));
             }
 
-            return new NesCartHeader(
+            var header = new NesCartHeader(
                 fileId,
                 rom[4],
                 rom[5],
@@ -56,6 +57,13 @@ namespace NesSharp.Cart
                 rom[10],
                 rom.Slice(11, 5).ToArray()
             );
+
+            if (header.isNes20)
+            {
+                throw new RomFormatException("iNES 2.0 currently unsupported");
+            }
+
+            return header;
         }
     }
 }

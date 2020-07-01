@@ -12,27 +12,27 @@ namespace NesSharp.PPU
             Nes = nes;
         }
 
-        public byte ReadByte(ushort address)
+        public byte ReadByte(ushort address, bool quiet = false)
         {
             if (InMapperRange(address))
             {
-                return Nes.Cart.Mapper.PpuReadByte(address);
+                return Nes.Cart.Mapper.PpuReadByte(address, quiet);
             }
             else
             {
-                return Nes.Ppu.Memory.ReadByte(address);
+                return Nes.Ppu.Memory.ReadByte(address, quiet);
             }
         }
 
-        public ushort ReadAddress(ushort address)
+        public ushort ReadAddress(ushort address, bool quiet = false)
         {
             if (InMapperRange(address))
             {
-                return Nes.Cart.Mapper.PpuReadUShort(address);
+                return Nes.Cart.Mapper.PpuReadUShort(address, quiet);
             }
             else
             {
-                return Nes.Ppu.Memory.ReadAddress(address);
+                return Nes.Ppu.Memory.ReadAddress(address, quiet);
             }
         }
 

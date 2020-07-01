@@ -8,8 +8,8 @@ namespace NesSharp.Utils
 
         static FastBits()
         {
-            PRECOMPILED = new bool[0xFF][];
-            for (byte i = 0; i < 0xFF; i++)
+            PRECOMPILED = new bool[0x100][];
+            for (var i = 0; i <= 0xFF; i++)
             {
                 PRECOMPILED[i] = new bool[] {
                     (i & 0x1) == 0x1,

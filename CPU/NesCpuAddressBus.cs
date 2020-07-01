@@ -12,11 +12,11 @@ namespace NesSharp.CPU
             Nes = nes;
         }
 
-        public byte ReadByte(ushort address)
+        public byte ReadByte(ushort address, bool quiet = false)
         {
             if (InMapperRange(address))
             {
-                return Nes.Cart.Mapper.CpuReadByte(address);
+                return Nes.Cart.Mapper.CpuReadByte(address, quiet);
             }
             else if (address >= 0x2000 && address <= 0x3FFF)
             {
@@ -30,15 +30,15 @@ namespace NesSharp.CPU
             }
             else
             {
-                return Nes.Cpu.Memory.ReadByte(address);
+                return Nes.Cpu.Memory.ReadByte(address, quiet);
             }
         }
 
-        public ushort ReadAddress(ushort address)
+        public ushort ReadAddress(ushort address, bool quiet = false)
         {
             if (InMapperRange(address))
             {
-                return Nes.Cart.Mapper.CpuReadUShort(address);
+                return Nes.Cart.Mapper.CpuReadUShort(address, quiet);
             }
             else if (address >= 0x2000 && address <= 0x3FFF)
             {
@@ -54,7 +54,7 @@ namespace NesSharp.CPU
             }
             else
             {
-                return Nes.Cpu.Memory.ReadAddress(address);
+                return Nes.Cpu.Memory.ReadAddress(address, quiet);
             }
         }
 

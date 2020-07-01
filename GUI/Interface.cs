@@ -1,10 +1,23 @@
 using System;
+using static SDL2.SDL;
+using static SDL2.SDL_image;
+using NesSharp.Debugger;
+using NesSharp.Utils;
 
 namespace NesSharp.GUI
 {
-    public class GuiInterface
+    public class GuiInterface : IDisposable
     {
+        private static ushort Width = 500;
+        private static ushort Height = 500;
+
         private Nes Nes;
+        private IntPtr window;
+        private IntPtr renderer;
+        private IntPtr texture;
+        private IntPtr background;
+
+        public Boolean Initialized { get; private set; }
 
         public GuiInterface(Nes nes)
         {
@@ -13,12 +26,90 @@ namespace NesSharp.GUI
 
         public void Init()
         {
+            if (this.Initialized)
+            {
+                return;
+            }
+
+            SDL_Init(SDL_INIT_VIDEO);
+            SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+            this.window = SDL_CreateWindow("NES#", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, 0);
+            this.renderer = SDL_CreateRenderer(this.window, -1, SDL_RendererFlags.SDL_RENDERER_ACCELERATED | SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
+            SDL_RenderSetLogicalSize(renderer, Width, Height);
+            this.texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, (int)SDL_TextureAccess.SDL_TEXTUREACCESS_STREAMING, Width, Height);
+            // var backSurface = IMG_Load("");
+            // this.background = SDL_CreateTextureFromSurface(renderer, backSurface);
+            // SDL_SetTextureColorMod(background, 60, 60, 60);
+            // SDL_FreeSurface(backSurface);
+
             this.Nes.Ppu.NewImageBufferFrame += OnNewFrame;
+
+            this.Initialized = true;
         }
 
-        private void OnNewFrame(uint[] imageBuffer)
+        private void Render()
         {
-            Console.WriteLine("Got new image buffer frame");
+            SDL_RenderClear(this.renderer);
+            SDL_RenderCopy(renderer, texture, IntPtr.Zero, IntPtr.Zero);
+
+            if (Nes.IsPaused)
+            {
+                // Show pause screen
+            }
+
+            SDL_RenderPresent(renderer);
+        }
+
+        public void Spin()
+        {
+            if (!this.Initialized)
+            {
+                return;
+            }
+
+            SDL_Event e = new SDL_Event();
+            uint frameStart, frameTime;
+
+            while (!Nes.IsStartingShutdown)
+            {
+                frameStart = SDL_GetTicks();
+
+                while (SDL_PollEvent(out e) > 0)
+                {
+                    switch (e.type)
+                    {
+                        case SDL_EventType.SDL_QUIT:
+                            Nes.Quit();
+                            return;
+                        case SDL_EventType.SDL_KEYDOWN:
+                            Nes.Debugger.Log(NesDebugger.TAG_GUI, "Got key {0}", e.key);
+                            break;
+                    }
+                }
+
+                Render();
+
+                frameTime = SDL_GetTicks() - frameStart;
+                if (frameTime < NesConsts.FRAME_DELAY_MS)
+                {
+                    SDL_Delay(NesConsts.FRAME_DELAY_MS - frameTime);
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            SDL_DestroyTexture(this.texture);
+            SDL_DestroyRenderer(this.renderer);
+            SDL_DestroyWindow(this.window);
+        }
+
+        private unsafe void OnNewFrame(uint[] imageBuffer)
+        {
+            fixed (uint* buf = imageBuffer)
+            {
+                SDL_UpdateTexture(this.texture, IntPtr.Zero, (IntPtr)buf, Width * sizeof(uint));
+            }
         }
     }
 }

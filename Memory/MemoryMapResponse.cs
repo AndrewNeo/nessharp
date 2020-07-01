@@ -1,17 +1,21 @@
 using System;
 
 namespace NesSharp.Memory
-{    
+{
     public ref struct MemoryMapResponse
     {
-        public MemoryMapResponse(byte[] memory, ushort offset, bool writable = false) : this(memory.AsSpan(), offset, writable) { }
-        public MemoryMapResponse(Span<byte> memory, ushort offset, bool writable = false)
+        public MemoryMapResponse(MemoryMapOrigin origin, byte[] memory, ushort offset, bool writable = false)
+            : this(origin, memory.AsSpan(), offset, writable) { }
+
+        public MemoryMapResponse(MemoryMapOrigin origin, Span<byte> memory, ushort offset, bool writable = false)
         {
+            this.origin = origin;
             this.memory = memory;
             this.offset = offset;
             this.writable = writable;
         }
 
+        MemoryMapOrigin origin;
         Span<byte> memory;
         ushort offset;
         bool writable;
@@ -23,7 +27,7 @@ namespace NesSharp.Memory
 
         public ushort ReadAddress(ushort address)
         {
-            return BitConverter.ToUInt16(memory.Slice(address - offset, 2));
+            return (ushort)((ReadByte(address) | (ReadByte((ushort)(address + 1)) << 8)));
         }
 
         public void Write(ushort address, byte value)
@@ -38,5 +42,18 @@ namespace NesSharp.Memory
         {
             return this.memory.ToArray();
         }
+    }
+
+    public enum MemoryMapOrigin
+    {
+        OpenBus,
+        CpuBidirectionalIO,
+        CpuWorkingRam,
+        PpuVram,
+        PpuPaletteRam,
+        CartExpansionArea,
+        CartProgramRam,
+        CartProgramRom,
+        CartCharacterRom,
     }
 }

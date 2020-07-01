@@ -1,6 +1,6 @@
 using System;
 
-namespace NesSharp.Utils
+namespace NesSharp
 {
     interface IResettable
     {

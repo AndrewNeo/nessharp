@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using NesSharp.Debugger;
 using NesSharp.Utils;
 
 namespace NesSharp.CPU
@@ -27,17 +28,20 @@ namespace NesSharp.CPU
 
         private readonly Nes Nes;
 
-        private readonly NesCpuAddressBus Bus;
-        public readonly NesCpuMemory Memory;
+        public readonly NesCpuAddressBus Bus;
+        internal readonly NesCpuMemory Memory;
 
+        private uint CycleCount;
         private NesCpuState CurrentState;
         private byte currentCycleCost;
+        private byte currentOpcode;
+        private ushort? entryPoint;
 
         public NesCpu(Nes nes)
         {
             this.Nes = nes;
             this.Bus = new NesCpuAddressBus(nes);
-            this.Memory = new NesCpuMemory();
+            this.Memory = new NesCpuMemory(nes);
 
             CacheOpcodes();
 
@@ -46,9 +50,12 @@ namespace NesSharp.CPU
 
         public bool ActiveNmi { get; set; }
         public bool ActiveIrq { get; set; }
+        public NesCpuState PublicCpuState { get { var copy = this.CurrentState; return copy; } }
 
-        public bool Update(bool stopOnInvalidOpcode = false)
+        public bool Update()
         {
+            CycleCount++;
+
             if (CurrentState.CycleTicksRemain > 0)
             {
                 Nes.Debugger.Log(NesDebugger.TAG_CPU, "Sleeping for {0} cycles", CurrentState.CycleTicksRemain);
@@ -70,13 +77,12 @@ namespace NesSharp.CPU
             }
 
             var instruction = Bus.ReadByte(CurrentState.PC);
-            Nes.Debugger.ExecOpCode(instruction);
             CurrentState.PC++;
 
             // Calling this sets currentCycleCost and runs the function
             if (instruction == 0xFF)
             {
-                throw new Exception("Caught invalid instruction");
+                throw new Exception("Caught illegal instruction (bad read?)");
             }
 
             var methodCall = FUNCTION_LOOKUP[instruction];
@@ -87,9 +93,9 @@ namespace NesSharp.CPU
             }
             else
             {
-                Nes.Debugger.Log(NesDebugger.TAG_CPU, "Unsupported opcode 0x{0:x}", instruction);
+                Nes.Debugger.Log(NesDebugger.TAG_CPU, "Unsupported opcode 0x{0:X2}", instruction);
 
-                if (stopOnInvalidOpcode)
+                if (Nes.Debugger.FailOnInvalidOpcode)
                 {
                     return false;
                 }
@@ -130,15 +136,26 @@ namespace NesSharp.CPU
         {
             ActiveNmi = false;
             ActiveIrq = false;
-            JumpWithVectorTable(FixedJumpVector.Reset);
+
+            JumpWithVectorTable(entryPoint ?? (ushort)FixedJumpVector.Reset);
         }
 
         private void JumpWithVectorTable(FixedJumpVector fjv)
         {
-            var jumpVector = Bus.ReadAddress((ushort)fjv);
+            JumpWithVectorTable((ushort)fjv);
+        }
+
+        private void JumpWithVectorTable(ushort address)
+        {
+            var jumpVector = Bus.ReadAddress(address);
+            if (jumpVector == 0xFFFF)
+            {
+                throw new IllegalMemoryAccessException(AddressBus.CPU, jumpVector, "Tried jumping to 0xFFFF, bad mapper configuration?");
+            }
+
             CurrentState.PC = jumpVector;
 
-            Nes.Debugger.Log(NesDebugger.TAG_CPU, "Set jump vector to {0:x}", jumpVector);
+            Nes.Debugger.Log(NesDebugger.TAG_CPU, "Set jump vector to 0x{0:X4}", jumpVector);
         }
 
         #endregion
@@ -303,7 +320,7 @@ namespace NesSharp.CPU
 
         #endregion
 
-        // Handle opcodes
+        #region Opcodes
 
         #region Opcode registration system
 
@@ -326,6 +343,7 @@ namespace NesSharp.CPU
                     Action call = () =>
                     {
                         this.currentCycleCost = cost;
+                        this.currentOpcode = opcode;
                         del.Invoke(mode);
                     };
 
@@ -352,6 +370,8 @@ namespace NesSharp.CPU
         {
             UpdateStandardFlags(CurrentState.A);
             CurrentState.Y = CurrentState.A;
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0xAA, "TAX", 2)]
@@ -359,6 +379,8 @@ namespace NesSharp.CPU
         {
             UpdateStandardFlags(CurrentState.A);
             CurrentState.X = CurrentState.A;
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0xBA, "TSX", 2)]
@@ -366,6 +388,8 @@ namespace NesSharp.CPU
         {
             UpdateStandardFlags(CurrentState.S);
             CurrentState.X = CurrentState.S;
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x98, "TYA", 2)]
@@ -373,6 +397,8 @@ namespace NesSharp.CPU
         {
             UpdateStandardFlags(CurrentState.Y);
             CurrentState.A = CurrentState.Y;
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x8A, "TXA", 2)]
@@ -380,6 +406,8 @@ namespace NesSharp.CPU
         {
             UpdateStandardFlags(CurrentState.X);
             CurrentState.A = CurrentState.X;
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x9A, "TXS", 2)]
@@ -387,6 +415,8 @@ namespace NesSharp.CPU
         {
             UpdateStandardFlags(CurrentState.X);
             CurrentState.S = CurrentState.X;
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0xA9, "LDA", 2, AddressingMode.Immediate)]
@@ -403,6 +433,8 @@ namespace NesSharp.CPU
 
             UpdateStandardFlags(operand);
             CurrentState.A = operand;
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0xA2, "LDX", 2, AddressingMode.Immediate)]
@@ -416,6 +448,8 @@ namespace NesSharp.CPU
 
             UpdateStandardFlags(operand);
             CurrentState.X = operand;
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0x0A, "LDY", 2, AddressingMode.Immediate)]
@@ -429,6 +463,8 @@ namespace NesSharp.CPU
 
             UpdateStandardFlags(operand);
             CurrentState.Y = operand;
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         #endregion
@@ -446,6 +482,8 @@ namespace NesSharp.CPU
         {
             var address = FetchOperandAddress(mode, true);
             Bus.Write(address, CurrentState.A);
+
+            Nes.Debugger.ExecOpCode(currentOpcode, address);
         }
 
         [Opcode(0x86, "STX", 3, AddressingMode.ZeroPage)]
@@ -455,6 +493,8 @@ namespace NesSharp.CPU
         {
             var address = FetchOperandAddress(mode, true);
             Bus.Write(address, CurrentState.X);
+
+            Nes.Debugger.ExecOpCode(currentOpcode, address);
         }
 
         [Opcode(0x84, "STY", 3, AddressingMode.ZeroPage)]
@@ -464,6 +504,8 @@ namespace NesSharp.CPU
         {
             var address = FetchOperandAddress(mode, true);
             Bus.Write(address, CurrentState.Y);
+
+            Nes.Debugger.ExecOpCode(currentOpcode, address);
         }
 
         #endregion
@@ -475,12 +517,16 @@ namespace NesSharp.CPU
         private void Operation_PHA(AddressingMode mode)
         {
             StackPush(CurrentState.A);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x08, "PHP", 3)]
         private void Operation_PHP(AddressingMode mode)
         {
             StackPush(CurrentState.P);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x68, "PLA", 4)]
@@ -489,12 +535,16 @@ namespace NesSharp.CPU
             var operand = StackPull();
             UpdateStandardFlags(operand);
             CurrentState.A = operand;
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0x28, "PLP", 4)]
         private void Operation_PLP(AddressingMode mode)
         {
             CurrentState.P = StackPull();
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         #endregion
@@ -522,6 +572,8 @@ namespace NesSharp.CPU
             CurrentState.SetStatusFlag(StatusFlags.Overflow, ((value ^ CurrentState.A) & (value ^ operand) & 0x0080) > 0);
 
             CurrentState.A = (byte)(value & 0x00FF);
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0xE9, "SBC", 2, AddressingMode.Immediate)]
@@ -545,6 +597,8 @@ namespace NesSharp.CPU
             CurrentState.SetStatusFlag(StatusFlags.Overflow, ((value ^ CurrentState.A) & (value ^ operand) & 0x0080) > 0);
 
             CurrentState.A = (byte)(value & 0x00FF);
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         #endregion
@@ -566,6 +620,8 @@ namespace NesSharp.CPU
             operand &= CurrentState.A;
             UpdateStandardFlags(operand);
             CurrentState.A = operand;
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0x49, "EOR", 2, AddressingMode.Immediate)]
@@ -583,6 +639,8 @@ namespace NesSharp.CPU
             operand ^= CurrentState.A;
             UpdateStandardFlags(operand);
             CurrentState.A = operand;
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0x09, "ORA", 2, AddressingMode.Immediate)]
@@ -600,6 +658,8 @@ namespace NesSharp.CPU
             operand |= CurrentState.A;
             UpdateStandardFlags(operand);
             CurrentState.A = operand;
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         #endregion
@@ -623,6 +683,8 @@ namespace NesSharp.CPU
             CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x0080) > 0);
             CurrentState.SetStatusFlag(StatusFlags.Zero, CurrentState.A == (value & 0x00FF));
             CurrentState.SetStatusFlag(StatusFlags.Carry, CurrentState.A >= (value & 0x00FF));
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0xE0, "CPX", 2, AddressingMode.Immediate)]
@@ -637,6 +699,8 @@ namespace NesSharp.CPU
             CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x0080) > 0);
             CurrentState.SetStatusFlag(StatusFlags.Zero, CurrentState.X == (value & 0x00FF));
             CurrentState.SetStatusFlag(StatusFlags.Carry, CurrentState.X >= (value & 0x00FF));
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0xC0, "CPY", 2, AddressingMode.Immediate)]
@@ -651,6 +715,8 @@ namespace NesSharp.CPU
             CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x0080) > 0);
             CurrentState.SetStatusFlag(StatusFlags.Zero, CurrentState.Y == (value & 0x00FF));
             CurrentState.SetStatusFlag(StatusFlags.Carry, CurrentState.Y >= (value & 0x00FF));
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         [Opcode(0x24, "BIT", 3, AddressingMode.ZeroPage)]
@@ -664,6 +730,8 @@ namespace NesSharp.CPU
             CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x80) == 1);
             CurrentState.SetStatusFlag(StatusFlags.Zero, value == 0x0);
             CurrentState.SetStatusFlag(StatusFlags.Overflow, (value & 0x40) == 1);
+
+            Nes.Debugger.ExecOpCode(currentOpcode, operand);
         }
 
         #endregion
@@ -674,18 +742,20 @@ namespace NesSharp.CPU
         {
             if (address >= 0x0002 && address <= 0x1FFF)
             {
-                Nes.Debugger.Log(NesDebugger.TAG_CPU, "Jumping to working RAM address 0x{0:x}", address);
+                Nes.Debugger.Log(NesDebugger.TAG_CPU, "Jumping to working RAM address 0x{0:X4}", address);
             }
             else if (address >= 0x6000 && address <= 0xFFFF)
             {
-                Nes.Debugger.Log(NesDebugger.TAG_CPU, "Jumping to ROM address 0x{0:x}", address);
+                Nes.Debugger.Log(NesDebugger.TAG_CPU, "Jumping to ROM address 0x{0:X4}", address);
             }
             else
             {
-                Nes.Debugger.Log(NesDebugger.TAG_CPU, "WARN: Jumping to bad address? 0x{0:x}", address);
+                Nes.Debugger.Log(NesDebugger.TAG_CPU, "WARN: Jumping to bad address? 0x{0:X4}", address);
             }
 
             CurrentState.PC = address;
+
+            Nes.Debugger.ExecOpCode(currentOpcode, address);
         }
 
         [Opcode(0x4C, "JMP", 3, AddressingMode.Absolute)]
@@ -717,6 +787,8 @@ namespace NesSharp.CPU
 
             // Jump to restored address +1
             CurrentState.PC = (byte)(returnPoint + 1);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         #endregion
@@ -737,6 +809,8 @@ namespace NesSharp.CPU
 
                 CurrentState.PC += offset;
             }
+
+            Nes.Debugger.ExecOpCode(currentOpcode, offset);
         }
 
         [Opcode(0x10, "BPL", 2, AddressingMode.Relative)]
@@ -823,6 +897,8 @@ namespace NesSharp.CPU
             {
                 this.ActiveNmi = false;
             }
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x00, "BRK", 0)]
@@ -842,48 +918,73 @@ namespace NesSharp.CPU
         private void Operation_SEC(AddressingMode mode)
         {
             CurrentState.SetStatusFlag(StatusFlags.Carry, true);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x18, "CLC", 2)]
         private void Operation_CLC(AddressingMode mode)
         {
             CurrentState.SetStatusFlag(StatusFlags.Carry, true);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0xF8, "SED", 2)]
         private void Operation_SED(AddressingMode mode)
         {
             CurrentState.SetStatusFlag(StatusFlags.Decimal, true);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0xD8, "CLD", 2)]
         private void Operation_CLD(AddressingMode mode)
         {
             CurrentState.SetStatusFlag(StatusFlags.Decimal, true);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x78, "SEI", 2)]
         private void Operation_SEI(AddressingMode mode)
         {
             CurrentState.SetStatusFlag(StatusFlags.Interrupt, true);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0x58, "CLI", 2)]
         private void Operation_CLI(AddressingMode mode)
         {
             CurrentState.SetStatusFlag(StatusFlags.Interrupt, false);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0xB8, "CLV", 2)]
         private void Operation_CLV(AddressingMode mode)
         {
             CurrentState.SetStatusFlag(StatusFlags.Overflow, false);
+
+            Nes.Debugger.ExecOpCode(currentOpcode);
         }
 
         [Opcode(0xEA, "NOP", 2)]
         private void Operation_NOP(AddressingMode mode)
         {
-            // Do nothing!
+            Nes.Debugger.ExecOpCode(currentOpcode);
+        }
+
+        #endregion
+
+        #endregion
+
+        #region Debugging
+
+        public void Debug_SetEntryPoint(ushort address)
+        {
+            entryPoint = address;
         }
 
         #endregion

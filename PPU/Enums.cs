@@ -4,8 +4,8 @@ namespace NesSharp.PPU
 {
     public enum MirrorMode : byte
     {
-        Vertical = 0,
-        Horizontal = 1
+        Horizontal = 0,
+        Vertical = 1
     }
 
     enum ScanlineBand
