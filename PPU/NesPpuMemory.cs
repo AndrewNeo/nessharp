@@ -12,9 +12,9 @@ namespace NesSharp.PPU
 
         public NesPpuMemory(Nes nes) : base(nes, AddressBus.PPU)
         {
-            Vram = new byte[NesConsts.ChrPageSize * 2];
-            PaletteRAM = new byte[0x20];
-            OAMram = new byte[0x100];
+            Vram = new byte[(NesConsts.ChrPageSize * 2) + 1];
+            PaletteRAM = new byte[0x20 + 1];
+            OAMram = new byte[0x100 + 1];
         }
 
         public void SoftReset()
@@ -43,8 +43,7 @@ namespace NesSharp.PPU
             else if (address >= 0x3F00 && address <= 0x3FFF)
             {
                 // 0x3F00-0x3FFF are mirrored every 32 bytes
-                ushort offset = (ushort)(address + (0x3F00 % 32));
-                return new MemoryMapResponse(MemoryMapOrigin.PpuPaletteRam, PaletteRAM, offset, true);
+                return new MemoryMapResponse(MemoryMapOrigin.PpuPaletteRam, PaletteRAM, 0x3F00, true, repeat: 32);
             }
             else if (address >= 0x4000)
             {

@@ -33,7 +33,7 @@ namespace NesSharp.Cart
                 header,
                 prgRom.ToArray(),
                 chrRom.ToArray(),
-                new byte[NesConsts.PrgPageSize],
+                new byte[NesConsts.PrgPageSize + 1],
                 NesCartMapper.Build(nes, header)
             );
         }

@@ -11,8 +11,7 @@ namespace NesSharp.PPU
         internal readonly NesPpuMemory Memory;
         internal event ImageFrame NewImageBufferFrame;
 
-        private readonly byte[] Registers;
-        private readonly uint[] ImageBuffer;
+        public readonly uint[] ImageBuffer;
         private readonly Sprite[] OAM1, OAM2;
 
         public NesPpu(Nes nes)
@@ -21,19 +20,18 @@ namespace NesSharp.PPU
             this.Bus = new NesPpuAddressBus(nes);
             this.Memory = new NesPpuMemory(nes);
 
-            this.Registers = new byte[8];
             this.ImageBuffer = new uint[NesConsts.IMAGE_BUFFER_SIZE];
             this.OAM1 = new Sprite[8];
             this.OAM2 = new Sprite[8];
 
-            this.Control = new ControlRegisterValues(Registers, 0);
-            this.Mask = new MaskRegisterValues(Registers, 1);
-            this.Status = new StatusRegisterValues(Registers, 2);
+            this.Control = new ControlRegisterValues(0);
+            this.Mask = new MaskRegisterValues(0);
+            this.Status = new StatusRegisterValues(0);
         }
 
         public void Update()
         {
-            switch (currentScanline)
+            switch (CurrentScanline)
             {
                 case ushort n when (n >= 0 && n <= 239):
                     RenderScanline(ScanlineBand.Visible);
@@ -49,14 +47,14 @@ namespace NesSharp.PPU
                     break;
             }
 
-            currentDot++;
-            if (currentDot > 340)
+            CurrentDot++;
+            if (CurrentDot > 340)
             {
-                currentDot %= 341;
-                currentScanline++;
-                if (currentScanline > 261)
+                CurrentDot %= 341;
+                CurrentScanline++;
+                if (CurrentScanline > 261)
                 {
-                    currentScanline = 0;
+                    CurrentScanline = 0;
                     isFrameOdd = !isFrameOdd;
                 }
             }
@@ -65,7 +63,8 @@ namespace NesSharp.PPU
         // Internal state
 
         private MirrorMode mirrorMode;
-        private ushort currentScanline, currentDot;
+        public ushort CurrentScanline { get; private set; }
+        public ushort CurrentDot { get; private set; }
         private bool isFrameOdd;
         private byte nameTable, attrTable, backgroundLow, backgroundHigh;
         private byte attrTableShiftLow, attrTableShiftHigh;
@@ -106,37 +105,14 @@ namespace NesSharp.PPU
 
         // Internal registers
 
-        private byte ControlRegister
-        {
-            get { return Registers[0]; }
-            set { Registers[0] = value; }
-        }
-
         private ControlRegisterValues Control;
-
-        private byte MaskRegister
-        {
-            get { return Registers[1]; }
-            set { Registers[1] = value; }
-        }
-
+        public byte ControlRegister { get { return (byte)Control; } }
         private MaskRegisterValues Mask;
-
-        private byte StatusRegister
-        {
-            get
-            {
-                return Registers[2];
-            }
-            set
-            {
-                Registers[2] = value;
-            }
-        }
-
+        public byte MaskRegister { get { return (byte)Mask; } }
         private StatusRegisterValues Status;
+        public byte StatusRegister { get { return (byte)Status; } }
 
-        // External memory handling
+        // CPU-PPU memory mapping zone
 
         private byte ExtMemResult;
         private byte ExtMemBuffer;
@@ -152,16 +128,19 @@ namespace NesSharp.PPU
 
             if (address == 2)
             {
+                // PPUSTATUS ($2002)
                 ExtMemResult = (byte)((ExtMemResult & 0x1F) | StatusRegister);
                 Status.InVblank = false;
                 ExtMemLatch = false;
             }
             else if (address == 4)
             {
+                // OAMDATA ($2004)
                 ExtMemResult = Memory.OAMram[ExtMemOAMAddress];
             }
             else if (address == 7)
             {
+                // PPUDATA ($2007)
                 if (currentAddress.Address <= 0x3EFF)
                 {
                     ExtMemResult = ExtMemBuffer;
@@ -181,25 +160,37 @@ namespace NesSharp.PPU
 
         public void Write(ushort address, byte value)
         {
+            if (address >= 8)
+            {
+                throw new Exception("Tried writing out of range from PPU");
+            }
+
+            ExtMemResult = value;
+
             if (address == 0)
             {
-                ControlRegister = value;
+                // PPUCTRL ($2000)
+                Control = (ControlRegisterValues)value;
                 temporaryAddress.NametableSelect = Control.Nametable;
             }
             else if (address == 1)
             {
-                MaskRegister = value;
+                // PPUMASK ($2001)
+                Mask = (MaskRegisterValues)value;
             }
             else if (address == 3)
             {
+                // OAMADDR ($2003)
                 ExtMemOAMAddress = value;
             }
             else if (address == 4)
             {
+                // OAMDATA ($2004)
                 Memory.OAMram[ExtMemOAMAddress++] = value;
             }
             else if (address == 5)
             {
+                // PPUSCROLL ($2005)
                 if (!ExtMemLatch)
                 {
                     fineXScroll = (byte)(value & 7);
@@ -213,6 +204,7 @@ namespace NesSharp.PPU
             }
             else if (address == 6)
             {
+                // PPUADDR ($2006)
                 if (!ExtMemLatch)
                 {
                     temporaryAddress.High = (byte)(value & 0x3F);
@@ -227,12 +219,9 @@ namespace NesSharp.PPU
             }
             else if (address == 7)
             {
+                // PPUDATA ($2007)
                 Bus.Write(currentAddress.Address, value);
                 currentAddress.Address += (ushort)(Control.AddressIncrement ? 32 : 1);
-            }
-            else
-            {
-                throw new Exception("Tried reading out of range from PPU");
             }
         }
 
@@ -331,7 +320,7 @@ namespace NesSharp.PPU
             byte n = 0;
             for (byte i = 0; i < 64; i++)
             {
-                var line = (currentScanline == 261 ? -1 : currentScanline) - Memory.OAMram[i * 4 + 0];
+                var line = (CurrentScanline == 261 ? -1 : CurrentScanline) - Memory.OAMram[i * 4 + 0];
 
                 // Copy sprites in scanline to OAM2
                 if (line >= 0 && line < SpriteHeight)
@@ -370,7 +359,7 @@ namespace NesSharp.PPU
                     address = (ushort)((Control.SpritePatternTable ? 0x1000 : 0x0) + (OAM1[1].Tile & 16));
                 }
 
-                ushort spriteY = (ushort)((currentScanline - OAM1[i].Y) % SpriteHeight);
+                ushort spriteY = (ushort)((CurrentScanline - OAM1[i].Y) % SpriteHeight);
 
                 if ((OAM1[i].Attribute & 0x80) > 0)
                 {
@@ -394,9 +383,9 @@ namespace NesSharp.PPU
             byte palette = 0;
             byte objectPalette = 0;
             bool objectPriority = false;
-            int x = currentDot - 2;
+            int x = CurrentDot - 2;
 
-            if (currentScanline < 240 && x >= 0 && x < 256)
+            if (CurrentScanline < 240 && x >= 0 && x < 256)
             {
                 // Render background
                 if (Mask.ShowBackground && !(!Mask.ShowBackgroundLeft && x < 8))
@@ -467,7 +456,7 @@ namespace NesSharp.PPU
                     }
 
                     byte color = Bus.ReadByte((ushort)(0x3F00 + (Rendering ? palette : 0)));
-                    ImageBuffer[currentScanline * 256 + x] = PpuConsts.NES_RGB[color];
+                    ImageBuffer[CurrentScanline * 256 + x] = PpuConsts.NES_RGB[color];
                 }
             }
 
@@ -482,7 +471,7 @@ namespace NesSharp.PPU
         {
             ushort addr = 0x00;
 
-            if (band == ScanlineBand.NMI && currentDot == 1)
+            if (band == ScanlineBand.NMI && CurrentDot == 1)
             {
                 Status.InVblank = true;
                 if (Control.EnableNMI)
@@ -490,17 +479,17 @@ namespace NesSharp.PPU
                     Nes.Cpu.ActiveNmi = true;
                 }
             }
-            else if (band == ScanlineBand.AfterVisible && currentDot == 0)
+            else if (band == ScanlineBand.AfterVisible && CurrentDot == 0)
             {
                 if (NewImageBufferFrame != null)
                 {
-                    NewImageBufferFrame.Invoke(ImageBuffer);
+                    NewImageBufferFrame.Invoke();
                 }
             }
             else if (band == ScanlineBand.Visible || band == ScanlineBand.PreNext)
             {
                 // Handle sprites
-                switch (currentDot)
+                switch (CurrentDot)
                 {
                     case 1:
                         ClearOAM2();
@@ -519,7 +508,7 @@ namespace NesSharp.PPU
                 }
 
                 // Handle background
-                switch (currentDot)
+                switch (CurrentDot)
                 {
                     case 1:
                         addr = NametableAddress;
@@ -531,7 +520,7 @@ namespace NesSharp.PPU
                         break;
                     case ushort n when ((n >= 2 && n <= 255) || ((n >= 322 && n <= 337))):
                         DrawPixel();
-                        switch (currentDot)
+                        switch (CurrentDot)
                         {
                             // Nametable
                             case 1:
@@ -604,13 +593,13 @@ namespace NesSharp.PPU
                         nameTable = Bus.ReadByte(addr);
                         if (band == ScanlineBand.PreNext && Rendering && isFrameOdd)
                         {
-                            currentDot++;
+                            CurrentDot++;
                         }
                         break;
                 }
 
                 // Trigger scanline in mapper
-                if (currentDot == 260 && Rendering)
+                if (CurrentDot == 260 && Rendering)
                 {
                     this.Nes.Cart.Mapper.Scanline();
                 }
@@ -619,11 +608,9 @@ namespace NesSharp.PPU
 
         public void SoftReset()
         {
-            Registers[0] = 0x0;
-            Registers[1] = 0x0;
-            Registers[2] = 0x0;
-            Registers[5] = 0x0;
-            Registers[7] = 0x0;
+            Control = new ControlRegisterValues(0);
+            Mask = new MaskRegisterValues(0);
+            Status = new StatusRegisterValues(0);
 
             isFrameOdd = false;
 
@@ -632,12 +619,15 @@ namespace NesSharp.PPU
 
         public void HardReset()
         {
-            FastBits.Clear(Registers);
+            Control = new ControlRegisterValues(0);
+            Mask = new MaskRegisterValues(0);
+            Status = new StatusRegisterValues(0);
+
             FastBits.Clear(ImageBuffer);
 
             isFrameOdd = false;
-            currentScanline = 0;
-            currentDot = 0;
+            CurrentScanline = 0;
+            CurrentDot = 0;
 
             Memory.HardReset();
         }

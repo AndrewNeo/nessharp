@@ -13,7 +13,7 @@ namespace NesSharp.CPU
         public NesCpuMemory(Nes nes) : base(nes, AddressBus.CPU)
         {
             BidirectionalIO = new byte[2];
-            WorkingRam = new byte[2 * 1024];
+            WorkingRam = new byte[(2 * 1024) + 1];
         }
 
         public void SoftReset()
@@ -35,8 +35,7 @@ namespace NesSharp.CPU
             else if (address >= 0x0002 && address <= 0x1FFF)
             {
                 // 0x0002-0x07FF are mirrored every 0x800 bytes
-                ushort offset = (ushort)(address % 0x800);
-                return new MemoryMapResponse(MemoryMapOrigin.CpuWorkingRam, WorkingRam, offset, true);
+                return new MemoryMapResponse(MemoryMapOrigin.CpuWorkingRam, WorkingRam, 0, true, repeat: 0x800);
             }
             else if (address >= 0x2000 && address <= 0x3FFF)
             {
@@ -50,10 +49,11 @@ namespace NesSharp.CPU
             }
             else if (address >= 0x4018)
             {
-                throw new UnderhandledMemoryException(AddressBus.CPU, address, "CPU test mode space");
+                return new MemoryMapResponse(MemoryMapOrigin.OpenBus, OpenBus, address);
+                // throw new UnderhandledMemoryException(AddressBus.CPU, address, "CPU test mode space");
             }
 
-            return new MemoryMapResponse(MemoryMapOrigin.OpenBus, OpenBus, 0, false);
+            return new MemoryMapResponse(MemoryMapOrigin.OpenBus, OpenBus, address);
         }
     }
 }

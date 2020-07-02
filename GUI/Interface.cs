@@ -17,7 +17,8 @@ namespace NesSharp.GUI
         private IntPtr texture;
         private IntPtr background;
 
-        public Boolean Initialized { get; private set; }
+        public bool Initialized { get; private set; }
+        private bool hasNewFrame = false;
 
         public GuiInterface(Nes nes)
         {
@@ -31,7 +32,11 @@ namespace NesSharp.GUI
                 return;
             }
 
-            SDL_Init(SDL_INIT_VIDEO);
+            if (SDL_Init(SDL_INIT_VIDEO) != 0)
+            {
+                throw new Exception("Couldn't initialize SDL: " + SDL_GetError());
+            }
+
             SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
             this.window = SDL_CreateWindow("NES#", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, 0);
             this.renderer = SDL_CreateRenderer(this.window, -1, SDL_RendererFlags.SDL_RENDERER_ACCELERATED | SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
@@ -87,6 +92,13 @@ namespace NesSharp.GUI
                     }
                 }
 
+                if (hasNewFrame)
+                {
+                    // This isn't working right now
+                    // UpdateTexture();
+                    hasNewFrame = false;
+                }
+
                 Render();
 
                 frameTime = SDL_GetTicks() - frameStart;
@@ -100,13 +112,22 @@ namespace NesSharp.GUI
         public void Dispose()
         {
             SDL_DestroyTexture(this.texture);
+            this.texture = IntPtr.Zero;
             SDL_DestroyRenderer(this.renderer);
+            this.renderer = IntPtr.Zero;
             SDL_DestroyWindow(this.window);
+            this.window = IntPtr.Zero;
         }
 
-        private unsafe void OnNewFrame(uint[] imageBuffer)
+        private void OnNewFrame()
         {
-            fixed (uint* buf = imageBuffer)
+            // This is coming from the PPU thread so we need to render it in ours
+            hasNewFrame = true;
+        }
+
+        private unsafe void UpdateTexture()
+        {
+            fixed (uint* buf = Nes.Ppu.ImageBuffer)
             {
                 SDL_UpdateTexture(this.texture, IntPtr.Zero, (IntPtr)buf, Width * sizeof(uint));
             }

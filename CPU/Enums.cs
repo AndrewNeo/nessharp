@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Runtime.CompilerServices;
+using NesSharp.Utils;
 
 namespace NesSharp.CPU
 {
@@ -29,6 +30,11 @@ namespace NesSharp.CPU
         {
             get
             {
+                if (StatusRegister == null)
+                {
+                    return 0x0;
+                }
+
                 byte[] b = new byte[1];
                 // TODO: Make sure the byte doesn't get exported backwards
                 StatusRegister.CopyTo(b, 0);
@@ -69,14 +75,17 @@ namespace NesSharp.CPU
             A = 0;
             X = 0;
             Y = 0;
-            S = 0xFD;
+            S = 0;
             P = 0x34;
         }
     }
 
-    enum AddressingMode : int
+    public enum AddressingMode : int
     {
-        Unsupported = 0,
+        /// <summary>Implied addressing, can't return an address</summary>
+        Implicit = 0,
+        /// <summary>Special mode for using A as the operand</summary>
+        Accumulator,
         /// <summary>XXX #nn</summary>
         Immediate,
         /// <summary>XXX nn</summary>
@@ -101,7 +110,7 @@ namespace NesSharp.CPU
         Relative
     }
 
-    enum StatusFlagBytes : byte
+    public enum StatusFlagBytes : byte
     {
         /// <summary>C flag - 0=no carry, 1=carry</summary>
         Carry = 0x1,
@@ -123,17 +132,17 @@ namespace NesSharp.CPU
 
     public enum StatusFlags : int
     {
-        /// <summary>C flag - 0=no carry, 1=carry</summary>
+        /// <summary>C flag (0=no carry, 1=carry)</summary>
         Carry = 0,
-        /// <summary>Z flagm 0=nonzero, 1=zero</summary>
+        /// <summary>Z flag (0=nonzero, 1=zero)</summary>
         Zero = 1,
-        /// <summary>I flag, 0=IRQ enable, 1=IRQ disable</summary>
+        /// <summary>I flag (0=IRQ enable, 1=IRQ disable)</summary>
         Interrupt = 2,
-        /// <summary>Unused. D flag, 0=normal, 1=bcd mode</summary>
+        /// <summary>Unused. D flag (0=normal, 1=BCD mode)</summary>
         Decimal = 3,
-        /// <summary>B flag, 0=IRQ/NMI, 1=reset or BRK/PHP</summary>
+        /// <summary>B flag (0=IRQ/NMI, 1=reset or BRK/PHP)</summary>
         Break = 4,
-        /// <summary>Unused. (always 1)</summary>
+        /// <summary>Unused. (Always 1)</summary>
         Always1 = 5,
         /// <summary>V flag (0=no overflow, 1=overflow)</summary>
         Overflow = 6,

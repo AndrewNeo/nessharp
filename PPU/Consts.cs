@@ -14,5 +14,5 @@ namespace NesSharp.PPU
         };
     }
 
-    public delegate void ImageFrame(uint[] buffer);
+    public delegate void ImageFrame();
 }

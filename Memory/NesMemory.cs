@@ -39,7 +39,7 @@ namespace NesSharp.Memory
 
         public void Write(ushort address, byte value)
         {
-            Nes.Debugger.Log(NesDebugger.TAG_MAP, "{0} attempting to write {1:X2} to internal at 0x{2:X4}", Bus, address, value);
+            Nes.Debugger.Log(NesDebugger.TAG_MAP, "{0} attempting to write {2:X2} to internal at 0x{1:X4}", Bus, address, value);
             var mmr = MapMemory(address);
             mmr.Write(address, value);
         }

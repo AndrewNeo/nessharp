@@ -26,7 +26,8 @@ namespace NesSharp.CPU
             }
             else if (address >= 0x4000 && address <= 0x4017)
             {
-                throw new Exception("APU not yet implemented");
+                return 0xFF;
+                // throw new Exception("APU not yet implemented");
             }
             else
             {
@@ -44,13 +45,9 @@ namespace NesSharp.CPU
             {
                 throw new IllegalMemoryAccessException(AddressBus.CPU, address, "Attempted to read 16 bits from PPU registers");
             }
-            else if (address >= 0x4000 && address <= 0x4013)
+            else if (address >= 0x4000 && address <= 0x4017)
             {
-                throw new IllegalMemoryAccessException(AddressBus.CPU, address, "Attempted to read 16 bits from APU registers");
-            }
-            else if (address >= 0x4014 && address <= 0x4017)
-            {
-                throw new Exception("DMA not yet implemented");
+                throw new IllegalMemoryAccessException(AddressBus.CPU, address, "Attempted to read 16 bits from APU/status registers");
             }
             else
             {
@@ -72,11 +69,15 @@ namespace NesSharp.CPU
             }
             else if (address >= 0x4000 && address <= 0x4013)
             {
-                throw new Exception("APU not yet implemented");
+                // TODO: APU
             }
-            else if (address >= 0x4014 && address <= 0x4017)
+            else if (address >= 0x4014 && address <= 0x4015)
             {
-                throw new Exception("DMA not yet implemented");
+                // TODO: OAM-DMA
+            }
+            else if (address >= 0x4016 && address <= 0x4017)
+            {
+                // TODO: Joystick handling
             }
             else
             {

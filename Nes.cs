@@ -103,22 +103,28 @@ namespace NesSharp
             {
                 if (!IsPaused)
                 {
-                    this.Ppu.Update();
-                    this.Ppu.Update();
-                    this.Ppu.Update();
-                    if (!this.Cpu.Update())
+                    for (var i = 0; i < NesConsts.CYCLES_PER_FRAME; i++)
                     {
-                        if (this.Debugger.FailOnInvalidOpcode)
+                        if (IsStartingShutdown) { break; }
+
+                        this.Ppu.Update();
+                        this.Ppu.Update();
+                        this.Ppu.Update();
+                        if (!this.Cpu.Update())
                         {
-                            throw new Exception("CPU encountered invalid opcode");
+                            if (this.Debugger.FailOnInvalidOpcode)
+                            {
+                                Debugger.DumpAllMemory();
+                                this.Debugger.ExecOpCode(this.Cpu.PublicCpuState.PC, this.Debugger.LastOpcode);
+                                throw new Exception("CPU encountered invalid opcode");
+                            }
+
+                            Debugger.Log(NesDebugger.TAG_SYS, "CPU encountered invalid opcode");
                         }
 
-                        Debugger.Log(NesDebugger.TAG_SYS, "CPU encountered invalid opcode");
-                        break;
+                        this.Debugger.ConsoleView.Tick();
                     }
                 }
-
-                this.Debugger.ConsoleView.Tick();
 
                 if (IsStartingShutdown) { break; }
 

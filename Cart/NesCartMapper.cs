@@ -48,7 +48,7 @@ namespace NesSharp.Cart
             PPUEndRange = GetMemoryMapAttribute(AddressBus.PPU).End;
 
             OpenBus = new byte[3];
-            PrgRam = new byte[8 * 1024];
+            PrgRam = new byte[(8 * 1024) + 1];
         }
 
         // Mapper handling range definitions

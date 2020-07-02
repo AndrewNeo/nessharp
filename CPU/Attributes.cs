@@ -9,7 +9,7 @@ namespace NesSharp.CPU
             byte opcode,
             string name,
             byte cost,
-            AddressingMode mode = AddressingMode.Unsupported
+            AddressingMode mode = AddressingMode.Implicit
         )
         {
             this.Opcode = opcode;

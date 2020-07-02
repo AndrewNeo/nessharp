@@ -32,13 +32,13 @@ namespace NesSharp.Utils
         public static byte Write(bool[] bits)
         {
             return (byte)(
-                (bits[0] ? 0x1 : 0x0) &
-                (bits[1] ? 0x2 : 0x0) &
-                (bits[2] ? 0x4 : 0x0) &
-                (bits[3] ? 0x8 : 0x0) &
-                (bits[4] ? 0x10 : 0x0) &
-                (bits[5] ? 0x20 : 0x0) &
-                (bits[6] ? 0x40 : 0x0) &
+                (bits[0] ? 0x1 : 0x0) |
+                (bits[1] ? 0x2 : 0x0) |
+                (bits[2] ? 0x4 : 0x0) |
+                (bits[3] ? 0x8 : 0x0) |
+                (bits[4] ? 0x10 : 0x0) |
+                (bits[5] ? 0x20 : 0x0) |
+                (bits[6] ? 0x40 : 0x0) |
                 (bits[7] ? 0x80 : 0x0)
             );
         }

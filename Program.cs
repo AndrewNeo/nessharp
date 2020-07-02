@@ -8,12 +8,19 @@ namespace NesSharp
         static void Main(string[] args)
         {
             bool stepMode = false;
-            if (args != null && args.Contains("--step")) {
+            if (args != null && args.Contains("--step"))
+            {
                 stepMode = true;
             }
             bool failOnInvalidOpcode = false;
-            if (args != null && args.Contains("--failOnInvalidOpcode")) {
+            if (args != null && args.Contains("--failOnInvalidOpcode"))
+            {
                 failOnInvalidOpcode = true;
+            }
+
+            if (System.IO.File.Exists("operchase.txt"))
+            {
+                System.IO.File.Delete("operchase.txt");
             }
 
             using (Nes nes = new Nes())

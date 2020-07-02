@@ -3,26 +3,24 @@ using NesSharp.Utils;
 
 namespace NesSharp.PPU
 {
-    struct ControlRegisterValues
+    public struct ControlRegisterValues
     {
-        public ControlRegisterValues(byte[] registers, byte index)
+        public ControlRegisterValues(byte value)
         {
-            this.registers = registers;
-            this.index = index;
+            this.registerValue = value;
         }
 
-        private readonly byte[] registers;
-        private readonly byte index;
+        private byte registerValue;
 
         public byte Nametable
         {
             get
             {
-                return (byte)(registers[index] & 0x3);
+                return (byte)(registerValue & 0x3);
             }
             set
             {
-                registers[index] = (byte)(registers[index] | (value & 0x3));
+                registerValue = (byte)(registerValue | (value & 0x3));
             }
         }
 
@@ -30,7 +28,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[2];
+                return FastRead(2);
             }
             set
             {
@@ -42,7 +40,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[3];
+                return FastRead(3);
             }
             set
             {
@@ -54,7 +52,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[4];
+                return FastRead(4);
             }
             set
             {
@@ -66,7 +64,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[5];
+                return FastRead(5);
             }
             set
             {
@@ -78,7 +76,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[6];
+                return FastRead(6);
             }
             set
             {
@@ -90,7 +88,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[7];
+                return FastRead(7);
             }
             set
             {
@@ -98,30 +96,36 @@ namespace NesSharp.PPU
             }
         }
 
+        private bool FastRead(byte i)
+        {
+            return FastBits.Get(registerValue)[i];
+        }
+
         private void FastWrite(byte i, bool value)
         {
-            var updated = FastBits.Get(registers[index]);
+            var updated = FastBits.Get(registerValue);
             updated[i] = value;
-            registers[index] = FastBits.Write(updated);
+            registerValue = FastBits.Write(updated);
         }
+
+        public static implicit operator byte(ControlRegisterValues r) => r.registerValue;
+        public static explicit operator ControlRegisterValues(byte v) => new ControlRegisterValues(v);
     }
 
-    struct MaskRegisterValues
+    public struct MaskRegisterValues
     {
-        public MaskRegisterValues(byte[] registers, byte index)
+        public MaskRegisterValues(byte value)
         {
-            this.registers = registers;
-            this.index = index;
+            this.registerValue = value;
         }
 
-        private readonly byte[] registers;
-        private readonly byte index;
+        private byte registerValue;
 
         public bool Greyscale
         {
             get
             {
-                return FastBits.Get(registers[index])[0];
+                return FastRead(0);
             }
             set
             {
@@ -133,7 +137,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[1];
+                return FastRead(1);
             }
             set
             {
@@ -145,7 +149,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[2];
+                return FastRead(2);
             }
             set
             {
@@ -157,7 +161,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[3];
+                return FastRead(3);
             }
             set
             {
@@ -169,7 +173,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[4];
+                return FastRead(4);
             }
             set
             {
@@ -181,7 +185,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[5];
+                return FastRead(5);
             }
             set
             {
@@ -193,7 +197,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[6];
+                return FastRead(6);
             }
             set
             {
@@ -205,7 +209,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[7];
+                return FastRead(7);
             }
             set
             {
@@ -213,30 +217,36 @@ namespace NesSharp.PPU
             }
         }
 
+        private bool FastRead(byte i)
+        {
+            return FastBits.Get(registerValue)[i];
+        }
+
         private void FastWrite(byte i, bool value)
         {
-            var updated = FastBits.Get(registers[index]);
+            var updated = FastBits.Get(registerValue);
             updated[i] = value;
-            registers[index] = FastBits.Write(updated);
+            registerValue = FastBits.Write(updated);
         }
+
+        public static implicit operator byte(MaskRegisterValues r) => r.registerValue;
+        public static explicit operator MaskRegisterValues(byte v) => new MaskRegisterValues(v);
     }
 
-    struct StatusRegisterValues
+    public struct StatusRegisterValues
     {
-        public StatusRegisterValues(byte[] registers, byte index)
+        public StatusRegisterValues(byte value)
         {
-            this.registers = registers;
-            this.index = index;
+            this.registerValue = value;
         }
 
-        private readonly byte[] registers;
-        private readonly byte index;
+        private byte registerValue;
 
         public bool SpriteOverflow
         {
             get
             {
-                return FastBits.Get(registers[index])[5];
+                return FastRead(5);
             }
             set
             {
@@ -248,7 +258,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[6];
+                return FastRead(6);
             }
             set
             {
@@ -260,7 +270,7 @@ namespace NesSharp.PPU
         {
             get
             {
-                return FastBits.Get(registers[index])[7];
+                return FastRead(7);
             }
             set
             {
@@ -268,11 +278,19 @@ namespace NesSharp.PPU
             }
         }
 
+        private bool FastRead(byte i)
+        {
+            return FastBits.Get(registerValue)[i];
+        }
+
         private void FastWrite(byte i, bool value)
         {
-            var updated = FastBits.Get(registers[index]);
+            var updated = FastBits.Get(registerValue);
             updated[i] = value;
-            registers[index] = FastBits.Write(updated);
+            registerValue = FastBits.Write(updated);
         }
+
+        public static implicit operator byte(StatusRegisterValues r) => r.registerValue;
+        public static explicit operator StatusRegisterValues(byte v) => new StatusRegisterValues(v);
     }
 }
