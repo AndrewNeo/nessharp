@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using NesSharp.Debugger;
 
 namespace NesSharp
 {
@@ -26,7 +27,7 @@ namespace NesSharp
             using (Nes nes = new Nes())
             {
                 //nes.LoadCartFromFile("TestROMs/Super Mario Bros 3 (U) (PRG 1) [h2].nes");
-                // nes.Debugger.LogFilters = new string[] { NesDebugger.TAG_SYS, NesDebugger.TAG_CPU };
+                nes.Debugger.LogFilters = new string[] { NesDebugger.TAG_SYS };
                 nes.LoadCartFromFile("TestROMs/instr_test-v5/rom_singles/01-basics.nes");
                 // nes.Debugger.DumpPage(nes.Cart.PrgRom);
                 nes.InitGui();

@@ -50,6 +50,7 @@ namespace NesSharp.Debugger
             }
         }
 
+        [Conditional("TRACE")]
         public void Log(string component, string message, params object[] parm)
         {
             if (!(LogFilters?.Contains(component) ?? true))
@@ -57,11 +58,18 @@ namespace NesSharp.Debugger
                 return;
             }
 
-            ConsoleView.Log(component, message, parm);
+            System.Diagnostics.Trace.WriteLine($"DEBUGGER [{component}]: " + String.Format(message, parm));
         }
 
-        [Conditional("DEBUG")]
         public void ExecOpCode(ushort pc, byte opCode)
+        {
+            LastOpcode = opCode;
+            ExecOpCodeLog(pc, opCode);
+            ExecOpCodeChaseFile(pc, opCode);
+        }
+
+        [Conditional("TRACE")]
+        public void ExecOpCodeLog(ushort pc, byte opCode)
         {
             var name = "???";
             if (NesCpu.AllOpcodeNames.ContainsKey(opCode))
@@ -69,43 +77,67 @@ namespace NesSharp.Debugger
                 name = NesCpu.AllOpcodeNames[opCode];
             }
 
-            LastOpcode = opCode;
             var stackStr = BitConverter.ToString(CurrentStack).Replace("-", " ");
 
-            var logMessage = String.Format("Executed {1}: {0:X2}", opCode, name);
-            var chaseMessage = String.Format("{0:X4} | {1:X2} {2}", pc, opCode, name);
+            var message = String.Format("Executed {1}: {0:X2}", opCode, name);
 
             if (LastOpcodeMemoryOperandValue.HasValue)
             {
                 byte lmv = LastOpcodeMemoryValue.HasValue ? LastOpcodeMemoryValue.Value : (byte)0;
-                logMessage += " " + AddressOperandToString(LastOpcodeMemoryAddressMode.Value, LastOpcodeMemoryOperandValue.Value, lmv);
-                chaseMessage += " " + AddressOperandToString(LastOpcodeMemoryAddressMode.Value, LastOpcodeMemoryOperandValue.Value, lmv).PadRight(6);
+                message += " " + AddressOperandToString(LastOpcodeMemoryAddressMode.Value, LastOpcodeMemoryOperandValue.Value, lmv);
 
                 if (LastOpcodeMemoryResolvedAddress.HasValue && LastOpcodeMemoryValue.HasValue)
                 {
-                    logMessage += String.Format(" [{0:X4}] -> {1:X2}", LastOpcodeMemoryResolvedAddress.Value, LastOpcodeMemoryValue.Value);
-                    chaseMessage += String.Format(" [{0:X4}] -> {1:X2}", LastOpcodeMemoryResolvedAddress.Value, LastOpcodeMemoryValue.Value);
+                    message += String.Format(" [{0:X4}] -> {1:X2}", LastOpcodeMemoryResolvedAddress.Value, LastOpcodeMemoryValue.Value);
                 }
                 else if (LastOpcodeMemoryResolvedAddress.HasValue)
                 {
-                    logMessage += String.Format(" [{0:X4}[", LastOpcodeMemoryResolvedAddress.Value);
-                    chaseMessage += String.Format(" [{0:X4}]", LastOpcodeMemoryResolvedAddress.Value);
+                    message += String.Format(" [{0:X4}]", LastOpcodeMemoryResolvedAddress.Value);
                 }
             }
 
-            ConsoleView.Log(TAG_CPU, logMessage);
+            this.Log(TAG_CPU, message);
+        }
 
-            chaseMessage = chaseMessage.PadRight(37);
+        [Conditional("DEBUG")]
+        public void ExecOpCodeChaseFile(ushort pc, byte opCode)
+        {
+            var name = "???";
+            if (NesCpu.AllOpcodeNames.ContainsKey(opCode))
+            {
+                name = NesCpu.AllOpcodeNames[opCode];
+            }
+
+            var stackStr = BitConverter.ToString(CurrentStack).Replace("-", " ");
+
+            var message = String.Format("{0:X4} | {1:X2} {2}", pc, opCode, name);
+
+            if (LastOpcodeMemoryOperandValue.HasValue)
+            {
+                byte lmv = LastOpcodeMemoryValue.HasValue ? LastOpcodeMemoryValue.Value : (byte)0;
+                message += " " + AddressOperandToString(LastOpcodeMemoryAddressMode.Value, LastOpcodeMemoryOperandValue.Value, lmv).PadRight(6);
+
+                if (LastOpcodeMemoryResolvedAddress.HasValue && LastOpcodeMemoryValue.HasValue)
+                {
+                    message += String.Format(" [{0:X4}] -> {1:X2}", LastOpcodeMemoryResolvedAddress.Value, LastOpcodeMemoryValue.Value);
+                }
+                else if (LastOpcodeMemoryResolvedAddress.HasValue)
+                {
+                    message += String.Format(" [{0:X4}]", LastOpcodeMemoryResolvedAddress.Value);
+                }
+            }
+
+            message = message.PadRight(37);
 
             var cpuState = Nes.Cpu.PublicCpuState;
 
-            chaseMessage += String.Format("A:{0:X2} X:{1:X2} Y:{2:X2} S:{3:X2}",
+            message += String.Format("A:{0:X2} X:{1:X2} Y:{2:X2} S:{3:X2}",
                 cpuState.A,
                 cpuState.X,
                 cpuState.Y,
                 cpuState.S
             );
-            chaseMessage += String.Format(" C:{0} Z:{1} I:{2} B:{4} V:{6} N:{7}",
+            message += String.Format(" C:{0} Z:{1} I:{2} B:{4} V:{6} N:{7}",
                 (cpuState.P & (byte)StatusFlagBytes.Carry) > 0 ? 1 : 0,
                 (cpuState.P & (byte)StatusFlagBytes.Zero) > 0 ? 1 : 0,
                 (cpuState.P & (byte)StatusFlagBytes.Interrupt) > 0 ? 1 : 0,
@@ -116,26 +148,30 @@ namespace NesSharp.Debugger
                 (cpuState.P & (byte)StatusFlagBytes.Negative) > 0 ? 1 : 0
             );
 
-            chaseMessage += "    [" + stackStr + "]";
+            message += "    [" + stackStr + "]";
 
-            WriteToChasefile(chaseMessage);
+            WriteToChasefile(message);
         }
 
+        [Conditional("DEBUG")]
         public void DumpOpcodes()
         {
             Console.WriteLine("Total of {0} opcodes implemented", NesCpu.AllOpcodeNames.Count);
         }
 
+        [Conditional("DEBUG")]
         public void DumpPage(MemoryMapResponse mmr)
         {
             System.IO.File.WriteAllBytes("dump.bin", mmr.ToArray());
         }
 
+        [Conditional("DEBUG")]
         public void DumpPage(byte[] bytes)
         {
             System.IO.File.WriteAllBytes("dump.bin", bytes);
         }
 
+        [Conditional("DEBUG")]
         public void DumpAllMemory()
         {
             var cpuMemory = new byte[0x10000];
@@ -158,7 +194,7 @@ namespace NesSharp.Debugger
             System.IO.File.AppendAllText("operchase.txt", output + "\r\n");
         }
 
-        public string AddressOperandToString(AddressingMode mode, ushort address, byte value = 0)
+        private string AddressOperandToString(AddressingMode mode, ushort address, byte value = 0)
         {
             switch (mode)
             {

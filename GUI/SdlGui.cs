@@ -1,12 +1,11 @@
 using System;
 using static SDL2.SDL;
-using static SDL2.SDL_image;
 using NesSharp.Debugger;
 using NesSharp.Utils;
 
 namespace NesSharp.GUI
 {
-    public class GuiInterface : IDisposable
+    public class SdlGui : IGUI
     {
         private static ushort Width = 500;
         private static ushort Height = 500;
@@ -20,7 +19,7 @@ namespace NesSharp.GUI
         public bool Initialized { get; private set; }
         private bool hasNewFrame = false;
 
-        public GuiInterface(Nes nes)
+        public SdlGui(Nes nes)
         {
             this.Nes = nes;
         }
@@ -104,7 +103,9 @@ namespace NesSharp.GUI
                 frameTime = SDL_GetTicks() - frameStart;
                 if (frameTime < NesConsts.FRAME_DELAY_MS)
                 {
-                    SDL_Delay(NesConsts.FRAME_DELAY_MS - frameTime);
+                    // SDL_Delay(NesConsts.FRAME_DELAY_MS - frameTime);
+                    System.Threading.Thread.Sleep((int)(NesConsts.FRAME_DELAY_MS - frameTime));
+                    Nes.Debugger.ConsoleView.Update();
                 }
             }
         }

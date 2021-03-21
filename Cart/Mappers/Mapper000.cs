@@ -15,15 +15,14 @@ namespace NesSharp.Cart.Mappers
             if (address >= 0x6000 && address <= 0x7FFF)
             {
                 // PRG RAM on Family Basic only
-                //if (Nes.Cart.Header.hasPrgRam)
-                if (true)
-                {
+                /*if (Nes.Cart.Header.hasPrgRam)
+                {*/
                     return new MemoryMapResponse(MemoryMapOrigin.CartProgramRam, PrgRam, GetPrgRamOffset(0x6000, address), true);
-                }
+                /*}
                 else
                 {
                     return new MemoryMapResponse(MemoryMapOrigin.OpenBus, OpenBus, address, true);
-                }
+                }*/
             }
             else if (address >= 0x8000 && address <= 0xBFFF)
             {

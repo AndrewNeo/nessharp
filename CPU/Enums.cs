@@ -48,13 +48,11 @@ namespace NesSharp.CPU
 
         private BitArray StatusRegister;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool GetStatusFlag(StatusFlags flag)
         {
             return StatusRegister.Get((int)flag);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetStatusFlag(StatusFlags flag, bool value)
         {
             StatusRegister.Set((byte)flag, value);

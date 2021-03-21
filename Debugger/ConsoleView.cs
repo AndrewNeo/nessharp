@@ -29,8 +29,9 @@ namespace NesSharp.Debugger
 
         public bool AttachedToConsole { get; private set; }
         public uint Ticks { get; private set; }
-
         private Stopwatch TickTrackTimer;
+        public float ClockspeedCounterKhz { get; private set; }
+        private uint LastFrameTickCount;
         private int LastLine { get { return Console.WindowHeight - 2; } }
         private const bool TEST_MODE = true;
         private const int OUTPUT_START = 4 + (TEST_MODE ? 1 : 0);
@@ -173,24 +174,6 @@ namespace NesSharp.Debugger
             {
                 Start();
             }
-            else
-            {
-                Update();
-            }
-        }
-
-        public float ClockspeedCounterKhz { get; private set; }
-        private uint LastFrameTickCount;
-
-        public void Log(string component, string message, params object[] parm)
-        {
-            if (AttachedToConsole && !Nes.Debugger.StepMode)
-            {
-                Console.SetCursorPosition(0, OUTPUT_START + 1);
-            }
-
-            Console.Write($"DEBUGGER [{component}]: ");
-            Console.WriteLine(message, parm);
         }
 
         private void WriteWide(int line, string message)

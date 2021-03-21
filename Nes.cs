@@ -12,16 +12,16 @@ namespace NesSharp
 {
     public class Nes : IResettable, IDisposable
     {
-
-
         private Thread CpuThread;
 
         public Nes()
         {
+            Thread.CurrentThread.Name = "NES# GUI";
+
             Cpu = new NesCpu(this);
             Ppu = new NesPpu(this);
             Debugger = new NesDebugger(this);
-            Gui = new GuiInterface(this);
+            Gui = new SdlGui(this);
         }
 
         public readonly NesCpu Cpu;
@@ -32,7 +32,7 @@ namespace NesSharp
 
         public readonly NesDebugger Debugger;
 
-        public readonly GuiInterface Gui;
+        public readonly IGUI Gui;
 
         public bool IsPaused { get; set; }
         public bool IsStartingShutdown { get; set; }
@@ -67,6 +67,7 @@ namespace NesSharp
             HardReset();
 
             CpuThread = new Thread(new ThreadStart(Spin));
+            CpuThread.Name = "NES# CPU";
 
             CpuThread.Start();
             Gui.Spin();
@@ -123,19 +124,22 @@ namespace NesSharp
                         }
 
                         this.Debugger.ConsoleView.Tick();
+                        // this.Debugger.ConsoleView.Update();
                     }
                 }
 
                 if (IsStartingShutdown) { break; }
 
-                if (clock.ElapsedMilliseconds < NesConsts.FRAME_DELAY_MS)
+                /*if (clock.ElapsedMilliseconds < NesConsts.FRAME_DELAY_MS)
                 {
                     Thread.Sleep((int)(NesConsts.FRAME_DELAY_MS - clock.ElapsedMilliseconds));
-                }
+                }*/
+                // TODO: Technically we should cap this at max clockspeed but we're not there yet
+
                 clock.Restart();
             }
 
-            Debugger.Log(NesDebugger.TAG_SYS, "System clock loop finished");
+            Debugger.Log(NesDebugger.TAG_SYS, "System clock loop finished after " + this.Debugger.ConsoleView.Ticks + " ticks");
         }
     }
 }
