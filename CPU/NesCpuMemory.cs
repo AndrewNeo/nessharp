@@ -22,8 +22,8 @@ namespace NesSharp.CPU
 
         public void HardReset()
         {
-            FastBits.Clear(BidirectionalIO);
-            FastBits.Clear(WorkingRam);
+            FastBits.Clear(BidirectionalIO, 0xFF);
+            FastBits.Clear(WorkingRam, 0xFF);
         }
 
         protected override MemoryMapResponse MapMemory(ushort address)

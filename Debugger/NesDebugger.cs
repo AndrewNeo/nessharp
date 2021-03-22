@@ -21,20 +21,21 @@ namespace NesSharp.Debugger
         {
             this.Nes = nes;
             this.ConsoleView = new ConsoleView(nes);
+            this._debugInfo = new DebugInfo();
         }
 
         protected Nes Nes;
 
         public ConsoleView ConsoleView { get; set; }
 
+        private DebugInfo _debugInfo;
+        public DebugInfo DebugInfo { get { return _debugInfo; } }
+
         public bool FailOnInvalidOpcode { get; set; }
+        public bool TestMode { get; set; }
+        public bool Tracing { get; set; }
         public bool StepMode { get; set; }
         public string[] LogFilters { get; set; }
-        public byte LastOpcode { get; set; }
-        public ushort? LastOpcodeMemoryOperandValue { get; set; }
-        public ushort? LastOpcodeMemoryResolvedAddress { get; set; }
-        public AddressingMode? LastOpcodeMemoryAddressMode { get; set; }
-        public byte? LastOpcodeMemoryValue { get; set; }
 
         public byte[] CurrentStack
         {
@@ -50,6 +51,83 @@ namespace NesSharp.Debugger
             }
         }
 
+        public byte GetTestStatus()
+        {
+            return Nes.Cpu.Bus.ReadByte(0x6000, true);
+        }
+
+        public bool IsTestMode()
+        {
+            if (!TestMode)
+            {
+                return false;
+            }
+
+            var a1 = Nes.Cpu.Bus.ReadByte(0x6001, true);
+            var a2 = Nes.Cpu.Bus.ReadByte(0x6002, true);
+            var a3 = Nes.Cpu.Bus.ReadByte(0x6003, true);
+
+            return a1 == 0xDE && a2 == 0xB0 && a3 == 0x61;
+        }
+
+        public string GetTestTextOutput()
+        {
+            var testStrBytes = new byte[1024];
+            var len = 0;
+            for (var i = 0; i < testStrBytes.Length; i++)
+            {
+                var strb = Nes.Cpu.Bus.ReadByte((ushort)(0x6004 + i), true);
+                if (strb == 0x00)
+                {
+                    break;
+                }
+                testStrBytes[i] = strb;
+                len++;
+            }
+
+            var testStr = Encoding.ASCII.GetString(testStrBytes.AsSpan(0, len).ToArray());
+            return testStr;
+        }
+
+        public void CpuStartCycle(uint cycleCount)
+        {
+            _debugInfo.Ticks = cycleCount;
+            _debugInfo.MapperId = Nes.Cart.Header.MapperNumber;
+            _debugInfo.CpuState = Nes.Cpu.PublicCpuState;
+            _debugInfo.PpuCtrl = Nes.Ppu.ControlRegister;
+            _debugInfo.PpuMask = Nes.Ppu.MaskRegister;
+            _debugInfo.PpuStatus = Nes.Ppu.StatusRegister;
+            _debugInfo.PpuScanline = Nes.Ppu.CurrentScanline;
+            _debugInfo.PpuDot = Nes.Ppu.CurrentDot;
+        }
+
+        public void CpuStartOpcode(byte opCode, ushort pc, AddressingMode? addressingMode = null)
+        {
+            _debugInfo.Opcode = opCode;
+            _debugInfo.PC = pc;
+            _debugInfo.MemoryAddressMode = addressingMode;
+        }
+
+        public void CpuSetOperand(ushort operandValue, ushort address)
+        {
+            _debugInfo.MemoryOperandValue = operandValue;
+            _debugInfo.ResolvedAddress = address;
+        }
+
+        public void CpuSetOpcodeMem(byte operand)
+        {
+            _debugInfo.MemoryValue = operand;
+        }
+
+        public void CpuEndOpcode()
+        {
+            if (this.Tracing)
+            {
+                ExecOpCodeLog();
+                ExecOpCodeChaseFile();
+            }
+        }
+
         [Conditional("TRACE")]
         public void Log(string component, string message, params object[] parm)
         {
@@ -61,16 +139,11 @@ namespace NesSharp.Debugger
             System.Diagnostics.Trace.WriteLine($"DEBUGGER [{component}]: " + String.Format(message, parm));
         }
 
-        public void ExecOpCode(ushort pc, byte opCode)
-        {
-            LastOpcode = opCode;
-            ExecOpCodeLog(pc, opCode);
-            ExecOpCodeChaseFile(pc, opCode);
-        }
-
         [Conditional("TRACE")]
-        public void ExecOpCodeLog(ushort pc, byte opCode)
+        public void ExecOpCodeLog()
         {
+            var opCode = _debugInfo.Opcode;
+
             var name = "???";
             if (NesCpu.AllOpcodeNames.ContainsKey(opCode))
             {
@@ -81,18 +154,18 @@ namespace NesSharp.Debugger
 
             var message = String.Format("Executed {1}: {0:X2}", opCode, name);
 
-            if (LastOpcodeMemoryOperandValue.HasValue)
+            if (_debugInfo.MemoryOperandValue.HasValue)
             {
-                byte lmv = LastOpcodeMemoryValue.HasValue ? LastOpcodeMemoryValue.Value : (byte)0;
-                message += " " + AddressOperandToString(LastOpcodeMemoryAddressMode.Value, LastOpcodeMemoryOperandValue.Value, lmv);
+                byte lmv = _debugInfo.MemoryValue.HasValue ? _debugInfo.MemoryValue.Value : (byte)0;
+                message += " " + AddressOperandToString(_debugInfo.MemoryAddressMode.Value, _debugInfo.MemoryOperandValue.Value, lmv);
 
-                if (LastOpcodeMemoryResolvedAddress.HasValue && LastOpcodeMemoryValue.HasValue)
+                if (_debugInfo.ResolvedAddress.HasValue && _debugInfo.MemoryValue.HasValue)
                 {
-                    message += String.Format(" [{0:X4}] -> {1:X2}", LastOpcodeMemoryResolvedAddress.Value, LastOpcodeMemoryValue.Value);
+                    message += String.Format(" [{0:X4}] -> {1:X2}", _debugInfo.ResolvedAddress.Value, _debugInfo.MemoryValue.Value);
                 }
-                else if (LastOpcodeMemoryResolvedAddress.HasValue)
+                else if (_debugInfo.ResolvedAddress.HasValue)
                 {
-                    message += String.Format(" [{0:X4}]", LastOpcodeMemoryResolvedAddress.Value);
+                    message += String.Format(" [{0:X4}]", _debugInfo.ResolvedAddress.Value);
                 }
             }
 
@@ -100,8 +173,11 @@ namespace NesSharp.Debugger
         }
 
         [Conditional("DEBUG")]
-        public void ExecOpCodeChaseFile(ushort pc, byte opCode)
+        public void ExecOpCodeChaseFile()
         {
+            var opCode = _debugInfo.Opcode;
+            var pc = _debugInfo.PC;
+
             var name = "???";
             if (NesCpu.AllOpcodeNames.ContainsKey(opCode))
             {
@@ -112,18 +188,18 @@ namespace NesSharp.Debugger
 
             var message = String.Format("{0:X4} | {1:X2} {2}", pc, opCode, name);
 
-            if (LastOpcodeMemoryOperandValue.HasValue)
+            if (_debugInfo.MemoryOperandValue.HasValue)
             {
-                byte lmv = LastOpcodeMemoryValue.HasValue ? LastOpcodeMemoryValue.Value : (byte)0;
-                message += " " + AddressOperandToString(LastOpcodeMemoryAddressMode.Value, LastOpcodeMemoryOperandValue.Value, lmv).PadRight(6);
+                byte lmv = _debugInfo.MemoryValue.HasValue ? _debugInfo.MemoryValue.Value : (byte)0;
+                message += " " + AddressOperandToString(_debugInfo.MemoryAddressMode.Value, _debugInfo.MemoryOperandValue.Value, lmv).PadRight(6);
 
-                if (LastOpcodeMemoryResolvedAddress.HasValue && LastOpcodeMemoryValue.HasValue)
+                if (_debugInfo.ResolvedAddress.HasValue && _debugInfo.MemoryValue.HasValue)
                 {
-                    message += String.Format(" [{0:X4}] -> {1:X2}", LastOpcodeMemoryResolvedAddress.Value, LastOpcodeMemoryValue.Value);
+                    message += String.Format(" [{0:X4}] -> {1:X2}", _debugInfo.ResolvedAddress.Value, _debugInfo.MemoryValue.Value);
                 }
-                else if (LastOpcodeMemoryResolvedAddress.HasValue)
+                else if (_debugInfo.ResolvedAddress.HasValue)
                 {
-                    message += String.Format(" [{0:X4}]", LastOpcodeMemoryResolvedAddress.Value);
+                    message += String.Format(" [{0:X4}]", _debugInfo.ResolvedAddress.Value);
                 }
             }
 
@@ -138,15 +214,17 @@ namespace NesSharp.Debugger
                 cpuState.S
             );
             message += String.Format(" C:{0} Z:{1} I:{2} B:{4} V:{6} N:{7}",
-                (cpuState.P & (byte)StatusFlagBytes.Carry) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Zero) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Interrupt) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Decimal) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Break) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Always1) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Overflow) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Negative) > 0 ? 1 : 0
+                (cpuState.GetStatusFlag(StatusFlags.Carry) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Zero) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Interrupt) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Decimal) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Break) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Always1) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Overflow) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Negative) ? 1 : 0)
             );
+            message += String.Format("  PPU: {0,3},{1,3}", _debugInfo.PpuScanline, _debugInfo.PpuDot);
+            message += String.Format("  CYC: {0,8}", _debugInfo.Ticks);
 
             message += "    [" + stackStr + "]";
 
@@ -181,12 +259,12 @@ namespace NesSharp.Debugger
             }
             System.IO.File.WriteAllBytes("dump_cpu.bin", cpuMemory);
 
-            /*var ppuMemory = new byte[0x4000];
+            var ppuMemory = new byte[0x4000];
             for (var i = 0; i <= 0x3FFF; i++)
             {
                 ppuMemory[i] = Nes.Ppu.Bus.ReadByte((ushort)i, true);
             }
-            System.IO.File.WriteAllBytes("dump_cpu.bin", ppuMemory);*/
+            System.IO.File.WriteAllBytes("dump_ppu.bin", ppuMemory);
         }
 
         private void WriteToChasefile(string output)

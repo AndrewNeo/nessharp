@@ -13,7 +13,6 @@ namespace NesSharp.Debugger
         public ConsoleView(Nes nes)
         {
             this.Nes = nes;
-            this.Ticks = 0;
             this.TickTrackTimer = new Stopwatch();
 
             try
@@ -28,13 +27,11 @@ namespace NesSharp.Debugger
         }
 
         public bool AttachedToConsole { get; private set; }
-        public uint Ticks { get; private set; }
         private Stopwatch TickTrackTimer;
         public float ClockspeedCounterKhz { get; private set; }
         private uint LastFrameTickCount;
         private int LastLine { get { return Console.WindowHeight - 2; } }
-        private const bool TEST_MODE = true;
-        private const int OUTPUT_START = 4 + (TEST_MODE ? 1 : 0);
+        private const int OUTPUT_START = 5;
 
         public void Start()
         {
@@ -62,9 +59,9 @@ namespace NesSharp.Debugger
             WriteWide(2, "PC:XXXX A:XX X:XX Y:XX S:XX PP:X PP:X PP:X PP:X PP:X PP:X PP:X PP:X    ");
             WriteWide(3, "PPUCTRL: XX    PPUMASK: XX    PPUSTATUS: XX    Scanline: XXX");
 
-            if (TEST_MODE)
+            if (Nes.Debugger.TestMode)
             {
-                WriteWide(4, "Memory at 0x6000: XX    XX XX XX    _");
+                WriteWide(4, "Memory at 0x6000: XX");
             }
 
             WriteWide(OUTPUT_START, " === Console output ===");
@@ -76,27 +73,27 @@ namespace NesSharp.Debugger
         {
             if (TickTrackTimer.ElapsedMilliseconds > 1000)
             {
-                ClockspeedCounterKhz = ((Ticks - LastFrameTickCount) / (float)TickTrackTimer.ElapsedMilliseconds);
+                ClockspeedCounterKhz = ((Nes.Debugger.DebugInfo.Ticks - LastFrameTickCount) / (float)TickTrackTimer.ElapsedMilliseconds);
                 TickTrackTimer.Restart();
-                LastFrameTickCount = Ticks;
+                LastFrameTickCount = Nes.Debugger.DebugInfo.Ticks;
             }
 
             if (!AttachedToConsole) return;
 
             // Status line
             Console.SetCursorPosition(6, 1);
-            Console.Write("{0:D6}", this.Ticks);
+            Console.Write("{0:D6}", Nes.Debugger.DebugInfo.Ticks);
             Console.SetCursorPosition(41, 1);
-            Console.Write("{0:X2}", Nes.Debugger.LastOpcode);
+            Console.Write("{0:X2}", Nes.Debugger.DebugInfo.Opcode);
             Console.SetCursorPosition(58, 1);
-            Console.Write("{0:D2}", Nes.Cart.Header.MapperNumber);
+            Console.Write("{0:D2}", Nes.Debugger.DebugInfo.MapperId);
             Console.SetCursorPosition(76, 1);
             Console.Write("{0:G4}kHz   ", this.ClockspeedCounterKhz);
             Console.SetCursorPosition(93, 1);
             Console.Write("{0:P1}   ", ((this.ClockspeedCounterKhz / 1000.0) / 1.7897725f));
 
             // CPU line
-            var cpuState = Nes.Cpu.PublicCpuState;
+            var cpuState = Nes.Debugger.DebugInfo.CpuState;
             Console.SetCursorPosition(3, 2);
             Console.Write("{0:X4}", cpuState.PC);
             Console.SetCursorPosition(10, 2);
@@ -110,49 +107,34 @@ namespace NesSharp.Debugger
 
             Console.SetCursorPosition(28, 2);
             Console.Write("pC:{0} pZ:{1} pI:{2} pD:{3} pB:{4} p1:{5} pV:{6} pN:{7}",
-                (cpuState.P & (byte)StatusFlagBytes.Carry) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Zero) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Interrupt) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Decimal) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Break) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Always1) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Overflow) > 0 ? 1 : 0,
-                (cpuState.P & (byte)StatusFlagBytes.Negative) > 0 ? 1 : 0
+                (cpuState.GetStatusFlag(StatusFlags.Carry) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Zero) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Interrupt) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Decimal) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Break) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Always1) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Overflow) ? 1 : 0),
+                (cpuState.GetStatusFlag(StatusFlags.Negative) ? 1 : 0)
             );
 
             // PPU line
             Console.SetCursorPosition(9, 3);
-            Console.Write("{0:X2}", Nes.Ppu.ControlRegister);
+            Console.Write("{0:X2}", Nes.Debugger.DebugInfo.PpuCtrl);
             Console.SetCursorPosition(24, 3);
-            Console.Write("{0:X2}", Nes.Ppu.MaskRegister);
+            Console.Write("{0:X2}", Nes.Debugger.DebugInfo.PpuMask);
             Console.SetCursorPosition(41, 3);
-            Console.Write("{0:X2}", Nes.Ppu.StatusRegister);
+            Console.Write("{0:X2}", Nes.Debugger.DebugInfo.PpuStatus);
             Console.SetCursorPosition(57, 3);
-            Console.Write("{0:D3}", Nes.Ppu.CurrentScanline);
+            Console.Write("{0:D3}", Nes.Debugger.DebugInfo.PpuScanline);
 
             // Test mode line
-            if (TEST_MODE)
+            if (Nes.Debugger.TestMode)
             {
                 Console.SetCursorPosition(18, 4);
-                Console.Write("{0:X2}    {1:X2} {2:X2} {3:X2}",
-                    Nes.Cpu.Bus.ReadByte(0x6000, true),
-                    Nes.Cpu.Bus.ReadByte(0x6001, true),
-                    Nes.Cpu.Bus.ReadByte(0x6002, true),
-                    Nes.Cpu.Bus.ReadByte(0x6003, true)
-                );
+                Console.Write("{0:X2}", Nes.Debugger.GetTestStatus());
 
-                Console.SetCursorPosition(33, 4);
-                var testStrBytes = new byte[128];
-                for (var i = 0; i < testStrBytes.Length; i++)
-                {
-                    var strb = Nes.Cpu.Bus.ReadByte((ushort)(0x6004 + i));
-                    if (strb == 0x00)
-                    {
-                        break;
-                    }
-                    testStrBytes[i] = strb;
-                }
-                var testStr = Encoding.ASCII.GetChars(testStrBytes);
+                Console.SetCursorPosition(37, 4);
+                var testStr = Nes.Debugger.GetTestTextOutput();
                 Console.Write(testStr);
             }
 
@@ -168,12 +150,15 @@ namespace NesSharp.Debugger
                 Console.ReadKey();
             }
 
-            this.Ticks++;
-
             if (Nes.Debugger.StepMode)
             {
                 Start();
             }
+        }
+
+        public void End()
+        {
+            Console.SetCursorPosition(0, 0);
         }
 
         private void WriteWide(int line, string message)

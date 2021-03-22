@@ -26,9 +26,13 @@ namespace NesSharp
 
             using (Nes nes = new Nes())
             {
-                //nes.LoadCartFromFile("TestROMs/Super Mario Bros 3 (U) (PRG 1) [h2].nes");
+                nes.Debugger.Tracing = true;
+                nes.Debugger.TestMode = true;
                 nes.Debugger.LogFilters = new string[] { NesDebugger.TAG_SYS };
+                // nes.LoadCartFromFile("TestROMs/Super Mario Bros 3 (U) (PRG 1) [h2].nes");
+                // nes.LoadCartFromFile("TestROMs/nestest.nes");
                 nes.LoadCartFromFile("TestROMs/instr_test-v5/rom_singles/01-basics.nes");
+                // nes.LoadCartFromFile("TestROMs/instr_test-v5/rom_singles/02-implied.nes");
                 // nes.Debugger.DumpPage(nes.Cart.PrgRom);
                 nes.InitGui();
                 // nes.Start(0xC000);

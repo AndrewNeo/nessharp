@@ -34,7 +34,7 @@ namespace NesSharp.Cart.Mappers
                 if (Nes.Cart.Header.PrgRomPages == 1)
                 {
                     // Mirror of 0x8000-0xBFFF
-                    return new MemoryMapResponse(MemoryMapOrigin.CartProgramRom, Nes.Cart.PrgRom, 0x8000, false);
+                    return new MemoryMapResponse(MemoryMapOrigin.CartProgramRom, Nes.Cart.PrgRom, 0xC000, false);
                 }
                 else
                 {

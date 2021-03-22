@@ -98,13 +98,13 @@ namespace NesSharp.PPU
 
         private bool FastRead(byte i)
         {
-            return FastBits.Get(registerValue)[i];
+            return FastBits.Get(registerValue)[7 - i];
         }
 
         private void FastWrite(byte i, bool value)
         {
             var updated = FastBits.Get(registerValue);
-            updated[i] = value;
+            updated[7 - i] = value;
             registerValue = FastBits.Write(updated);
         }
 

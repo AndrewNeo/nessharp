@@ -43,14 +43,14 @@ namespace NesSharp.Utils
             );
         }
 
-        public static void Clear(byte[] b)
+        public static void Clear(byte[] b, byte value = 0)
         {
-            Array.Clear(b, 0, b.Length);
+            Array.Fill(b, value);
         }
 
-        public static void Clear(uint[] b)
+        public static void Clear(uint[] b, uint value = 0)
         {
-            Array.Clear(b, 0, b.Length);
+            Array.Fill(b, value);
         }
     }
 }

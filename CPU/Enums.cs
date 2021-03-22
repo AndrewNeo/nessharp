@@ -1,7 +1,5 @@
 using System;
 using System.Collections;
-using System.Runtime.CompilerServices;
-using NesSharp.Utils;
 
 namespace NesSharp.CPU
 {
@@ -36,13 +34,20 @@ namespace NesSharp.CPU
                 }
 
                 byte[] b = new byte[1];
-                // TODO: Make sure the byte doesn't get exported backwards
                 StatusRegister.CopyTo(b, 0);
                 return b[0];
             }
             set
             {
-                StatusRegister = new BitArray(new byte[] { value });
+                var tempReg = new BitArray(new byte[] { value });
+                SetStatusFlag(StatusFlags.Carry, tempReg[7]);
+                SetStatusFlag(StatusFlags.Zero, tempReg[6]);
+                SetStatusFlag(StatusFlags.Interrupt, tempReg[5]);
+                SetStatusFlag(StatusFlags.Decimal, tempReg[4]);
+                // Break can't be set when overwriting P
+                SetStatusFlag(StatusFlags.Always1, true);
+                SetStatusFlag(StatusFlags.Overflow, tempReg[1]);
+                SetStatusFlag(StatusFlags.Negative, tempReg[0]);
             }
         }
 
@@ -50,12 +55,24 @@ namespace NesSharp.CPU
 
         public bool GetStatusFlag(StatusFlags flag)
         {
-            return StatusRegister.Get((int)flag);
+            if (StatusRegister == null)
+            {
+                return false;
+            }
+
+            return StatusRegister.Get((7 - (int)flag));
         }
 
         public void SetStatusFlag(StatusFlags flag, bool value)
         {
-            StatusRegister.Set((byte)flag, value);
+            if (StatusRegister == null)
+            {
+                // Start with Always1 set
+                StatusRegister = new BitArray(new byte[] { 0x20 });
+            }
+
+            // 8 - flag because little endian
+            StatusRegister.Set((7 - (int)flag), value);
         }
 
         public void SoftReset()

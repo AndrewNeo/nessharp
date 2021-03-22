@@ -87,6 +87,7 @@ namespace NesSharp
         public void Quit()
         {
             Debugger.Log(NesDebugger.TAG_SYS, "Shutdown requested");
+            Debugger.ConsoleView.End();
             IsStartingShutdown = true;
         }
 
@@ -116,7 +117,6 @@ namespace NesSharp
                             if (this.Debugger.FailOnInvalidOpcode)
                             {
                                 Debugger.DumpAllMemory();
-                                this.Debugger.ExecOpCode(this.Cpu.PublicCpuState.PC, this.Debugger.LastOpcode);
                                 throw new Exception("CPU encountered invalid opcode");
                             }
 
@@ -125,21 +125,25 @@ namespace NesSharp
 
                         this.Debugger.ConsoleView.Tick();
                         // this.Debugger.ConsoleView.Update();
+
+                        if (this.Debugger.IsTestMode() && this.Debugger.GetTestStatus() != 0x80) {
+                            // Test complete
+                            IsStartingShutdown = true;
+                        }
                     }
                 }
 
                 if (IsStartingShutdown) { break; }
 
-                /*if (clock.ElapsedMilliseconds < NesConsts.FRAME_DELAY_MS)
+                if (clock.ElapsedMilliseconds < NesConsts.FRAME_DELAY_MS)
                 {
                     Thread.Sleep((int)(NesConsts.FRAME_DELAY_MS - clock.ElapsedMilliseconds));
-                }*/
-                // TODO: Technically we should cap this at max clockspeed but we're not there yet
+                }
 
                 clock.Restart();
             }
 
-            Debugger.Log(NesDebugger.TAG_SYS, "System clock loop finished after " + this.Debugger.ConsoleView.Ticks + " ticks");
+            Debugger.Log(NesDebugger.TAG_SYS, "System clock loop finished after " + this.Debugger.DebugInfo.Ticks + " ticks");
         }
     }
 }
