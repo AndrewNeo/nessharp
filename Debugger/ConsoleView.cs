@@ -106,15 +106,14 @@ namespace NesSharp.Debugger
             Console.Write("{0:X2}", cpuState.S);
 
             Console.SetCursorPosition(28, 2);
-            Console.Write("pC:{0} pZ:{1} pI:{2} pD:{3} pB:{4} p1:{5} pV:{6} pN:{7}",
-                (cpuState.GetStatusFlag(StatusFlags.Carry) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Zero) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Interrupt) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Decimal) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Break) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Always1) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Overflow) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Negative) ? 1 : 0)
+            Console.Write("p:{0:X2} pC:{1} pZ:{2} pI:{3} pD:{4} pV:{5} pN:{6}",
+                cpuState.P,
+                (cpuState.P_Carry ? 1 : 0),
+                (cpuState.P_Zero ? 1 : 0),
+                (cpuState.P_Interrupt ? 1 : 0),
+                (cpuState.P_Decimal ? 1 : 0),
+                (cpuState.P_Overflow ? 1 : 0),
+                (cpuState.P_Negative ? 1 : 0)
             );
 
             // PPU line
@@ -158,7 +157,10 @@ namespace NesSharp.Debugger
 
         public void End()
         {
-            Console.SetCursorPosition(0, 0);
+            if (AttachedToConsole)
+            {
+                Console.SetCursorPosition(0, 0);
+            }
         }
 
         private void WriteWide(int line, string message)

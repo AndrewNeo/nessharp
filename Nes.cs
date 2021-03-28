@@ -13,10 +13,15 @@ namespace NesSharp
     public class Nes : IResettable, IDisposable
     {
         private Thread CpuThread;
+        private static bool ThreadNameSet = false;
 
         public Nes()
         {
-            Thread.CurrentThread.Name = "NES# GUI";
+            if (!ThreadNameSet)
+            {
+                Thread.CurrentThread.Name = "NES# GUI";
+                ThreadNameSet = true;
+            }
 
             Cpu = new NesCpu(this);
             Ppu = new NesPpu(this);
@@ -126,7 +131,8 @@ namespace NesSharp
                         this.Debugger.ConsoleView.Tick();
                         // this.Debugger.ConsoleView.Update();
 
-                        if (this.Debugger.IsTestMode() && this.Debugger.GetTestStatus() != 0x80) {
+                        if (this.Debugger.IsTestMode() && this.Debugger.GetTestStatus() != 0x80)
+                        {
                             // Test complete
                             IsStartingShutdown = true;
                         }

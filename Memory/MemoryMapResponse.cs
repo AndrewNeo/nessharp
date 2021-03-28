@@ -24,12 +24,14 @@ namespace NesSharp.Memory
 
         public byte ReadByte(ushort address)
         {
+            var local = address - offset;
+
             if (repeat > 0)
             {
-                address = (ushort)(address % repeat);
+                local = (ushort)(local % repeat);
             }
 
-            return memory[address - offset];
+            return memory[local];
         }
 
         public ushort ReadAddress(ushort address)

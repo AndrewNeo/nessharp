@@ -207,21 +207,19 @@ namespace NesSharp.Debugger
 
             var cpuState = Nes.Cpu.PublicCpuState;
 
-            message += String.Format("A:{0:X2} X:{1:X2} Y:{2:X2} S:{3:X2}",
+            message += String.Format("A:{0:X2} X:{1:X2} Y:{2:X2} S:{3:X2} P:{4:X2}",
                 cpuState.A,
                 cpuState.X,
                 cpuState.Y,
-                cpuState.S
+                cpuState.S,
+                cpuState.P
             );
-            message += String.Format(" C:{0} Z:{1} I:{2} B:{4} V:{6} N:{7}",
-                (cpuState.GetStatusFlag(StatusFlags.Carry) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Zero) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Interrupt) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Decimal) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Break) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Always1) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Overflow) ? 1 : 0),
-                (cpuState.GetStatusFlag(StatusFlags.Negative) ? 1 : 0)
+            message += String.Format(" C:{0} Z:{1} I:{2} V:{3} N:{4}",
+                (cpuState.P_Carry ? 1 : 0),
+                (cpuState.P_Zero ? 1 : 0),
+                (cpuState.P_Interrupt ? 1 : 0),
+                (cpuState.P_Overflow ? 1 : 0),
+                (cpuState.P_Negative ? 1 : 0)
             );
             message += String.Format("  PPU: {0,3},{1,3}", _debugInfo.PpuScanline, _debugInfo.PpuDot);
             message += String.Format("  CYC: {0,8}", _debugInfo.Ticks);
@@ -259,12 +257,13 @@ namespace NesSharp.Debugger
             }
             System.IO.File.WriteAllBytes("dump_cpu.bin", cpuMemory);
 
-            var ppuMemory = new byte[0x4000];
+            // FIXME: This should be turned on but right now something is broken in ppuvram
+            /*var ppuMemory = new byte[0x4000];
             for (var i = 0; i <= 0x3FFF; i++)
             {
                 ppuMemory[i] = Nes.Ppu.Bus.ReadByte((ushort)i, true);
             }
-            System.IO.File.WriteAllBytes("dump_ppu.bin", ppuMemory);
+            System.IO.File.WriteAllBytes("dump_ppu.bin", ppuMemory);*/
         }
 
         private void WriteToChasefile(string output)

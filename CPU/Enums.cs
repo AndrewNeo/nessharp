@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using NesSharp.Utils;
 
 namespace NesSharp.CPU
 {
@@ -28,59 +29,46 @@ namespace NesSharp.CPU
         {
             get
             {
-                if (StatusRegister == null)
-                {
-                    return 0x0;
-                }
-
-                byte[] b = new byte[1];
-                StatusRegister.CopyTo(b, 0);
-                return b[0];
+                return (byte)(
+                    (P_Carry ? 1 : 0) << 0 |
+                    (P_Zero ? 1 : 0) << 1 |
+                    (P_Interrupt ? 1 : 0) << 2 |
+                    (P_Decimal ? 1 : 0) << 3 |
+                    1 << 5 |
+                    (P_Overflow ? 1 : 0) << 6 |
+                    (P_Negative ? 1 : 0) << 7
+                );
             }
             set
             {
-                var tempReg = new BitArray(new byte[] { value });
-                SetStatusFlag(StatusFlags.Carry, tempReg[7]);
-                SetStatusFlag(StatusFlags.Zero, tempReg[6]);
-                SetStatusFlag(StatusFlags.Interrupt, tempReg[5]);
-                SetStatusFlag(StatusFlags.Decimal, tempReg[4]);
-                // Break can't be set when overwriting P
-                SetStatusFlag(StatusFlags.Always1, true);
-                SetStatusFlag(StatusFlags.Overflow, tempReg[1]);
-                SetStatusFlag(StatusFlags.Negative, tempReg[0]);
+                P_Carry = (value & (byte)StatusFlags.Carry) > 0 ? true : false;
+                P_Zero = (value & (byte)StatusFlags.Zero) > 0 ? true : false;
+                P_Interrupt = (value & (byte)StatusFlags.Interrupt) > 0 ? true : false;
+                P_Decimal = (value & (byte)StatusFlags.Decimal) > 0 ? true : false;
+                P_Overflow = (value & (byte)StatusFlags.Overflow) > 0 ? true : false;
+                P_Negative = (value & (byte)StatusFlags.Negative) > 0 ? true : false;
             }
         }
 
-        private BitArray StatusRegister;
-
-        public bool GetStatusFlag(StatusFlags flag)
-        {
-            if (StatusRegister == null)
-            {
-                return false;
-            }
-
-            return StatusRegister.Get((7 - (int)flag));
-        }
-
-        public void SetStatusFlag(StatusFlags flag, bool value)
-        {
-            if (StatusRegister == null)
-            {
-                // Start with Always1 set
-                StatusRegister = new BitArray(new byte[] { 0x20 });
-            }
-
-            // 8 - flag because little endian
-            StatusRegister.Set((7 - (int)flag), value);
-        }
+        /// <summary>C flag</summary>
+        public bool P_Carry;
+        /// <summary>Z flag</summary>
+        public bool P_Zero;
+        /// <summary>I flag</summary>
+        public bool P_Interrupt;
+        /// <summary>D flag</summary>
+        public bool P_Decimal;
+        /// <summary>V flag</summary>
+        public bool P_Overflow;
+        /// <summary>N flag</summary>
+        public bool P_Negative;
 
         public void SoftReset()
         {
             // TODO: Verify
             CycleTicksRemain = 0;
             S = (byte)(S - 3);
-            SetStatusFlag(StatusFlags.Interrupt, true);
+            P_Interrupt = true;
         }
 
         public void HardReset()
@@ -125,17 +113,17 @@ namespace NesSharp.CPU
         Relative
     }
 
-    public enum StatusFlagBytes : byte
+    public enum StatusFlags : byte
     {
-        /// <summary>C flag - 0=no carry, 1=carry</summary>
+        /// <summary>C flag (0=no carry, 1=carry)</summary>
         Carry = 0x1,
-        /// <summary>Z flagm 0=nonzero, 1=zero</summary>
+        /// <summary>Z flag (0=nonzero, 1=zero)</summary>
         Zero = 0x2,
-        /// <summary>I flag, 0=IRQ enable, 1=IRQ disable</summary>
+        /// <summary>I flag (0=IRQ enable, 1=IRQ disable)</summary>
         Interrupt = 0x4,
-        /// <summary>Unused. D flag, 0=normal, 1=bcd mode</summary>
+        /// <summary>Unused. D flag (0=normal, 1=bcd mode)</summary>
         Decimal = 0x8,
-        /// <summary>B flag, 0=IRQ/NMI, 1=reset or BRK/PHP</summary>
+        /// <summary>B flag (0=IRQ/NMI, 1=reset or BRK/PHP)</summary>
         Break = 0x10,
         /// <summary>Unused. (always 1)</summary>
         Always1 = 0x20,
@@ -145,7 +133,7 @@ namespace NesSharp.CPU
         Negative = 0x80,
     }
 
-    public enum StatusFlags : int
+    /*public enum StatusFlags : int
     {
         /// <summary>C flag (0=no carry, 1=carry)</summary>
         Carry = 0,
@@ -163,7 +151,7 @@ namespace NesSharp.CPU
         Overflow = 6,
         /// <summary>N flag (0=positive, 1=negative)</summary>
         Negative = 7,
-    }
+    }*/
 
     enum InterruptMode
     {

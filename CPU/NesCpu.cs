@@ -69,7 +69,7 @@ namespace NesSharp.CPU
                 CurrentState.CycleTicksRemain = currentCycleCost;
                 return true;
             }
-            else if (ActiveIrq && !CurrentState.GetStatusFlag(StatusFlags.Interrupt))
+            else if (ActiveIrq && !CurrentState.P_Interrupt)
             {
                 Interrupt(InterruptMode.IRQ);
                 CurrentState.CycleTicksRemain = currentCycleCost;
@@ -343,8 +343,8 @@ namespace NesSharp.CPU
         private void UpdateNZFlags(byte operand)
         {
             // Negative flag is checking a signed byte is < 0. This check is equatable to converting to an sbyte and testing directly
-            CurrentState.SetStatusFlag(StatusFlags.Negative, (operand > 0x7F));
-            CurrentState.SetStatusFlag(StatusFlags.Zero, (operand == 0x0));
+            CurrentState.P_Negative = (operand & 0x80) > 0;
+            CurrentState.P_Zero = (operand == 0x0);
         }
 
         private void StackPush(byte value)
@@ -548,7 +548,7 @@ namespace NesSharp.CPU
         [Opcode(0x08, "PHP", 3)]
         private void Operation_PHP(AddressingMode mode)
         {
-            var flags = (byte)(CurrentState.P | ((byte)StatusFlagBytes.Break));
+            var flags = (byte)(CurrentState.P | ((byte)StatusFlags.Break));
             StackPush(flags);
         }
 
@@ -582,13 +582,13 @@ namespace NesSharp.CPU
         {
             var operand = FetchOperandByte(mode);
 
-            byte carry = (byte)(CurrentState.GetStatusFlag(StatusFlags.Carry) ? 1 : 0);
+            byte carry = (byte)(CurrentState.P_Carry ? 1 : 0);
             ushort value = (ushort)(CurrentState.A + carry + operand);
 
-            CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x0080) > 0);
-            CurrentState.SetStatusFlag(StatusFlags.Zero, (value & 0x00FF) == 0);
-            CurrentState.SetStatusFlag(StatusFlags.Carry, (value & 0xFF00) > 0);
-            CurrentState.SetStatusFlag(StatusFlags.Overflow, ((value ^ CurrentState.A) & (value ^ operand) & 0x0080) > 0);
+            CurrentState.P_Negative = ((value & 0x0080) > 0);
+            CurrentState.P_Zero = ((value & 0x00FF) == 0);
+            CurrentState.P_Carry = ((value & 0xFF00) > 0);
+            CurrentState.P_Overflow = (((value ^ CurrentState.A) & (value ^ operand) & 0x0080) > 0);
 
             CurrentState.A = (byte)(value & 0x00FF);
         }
@@ -605,13 +605,13 @@ namespace NesSharp.CPU
         {
             var operand = FetchOperandByte(mode);
 
-            byte carry = (byte)(CurrentState.GetStatusFlag(StatusFlags.Carry) ? 1 : 0);
+            byte carry = (byte)(CurrentState.P_Carry ? 1 : 0);
             ushort value = (ushort)(CurrentState.A - operand - (1 - carry));
 
-            CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x0080) > 0);
-            CurrentState.SetStatusFlag(StatusFlags.Zero, (value & 0x00FF) == 0);
-            CurrentState.SetStatusFlag(StatusFlags.Carry, (value & 0xFF00) == 0);
-            CurrentState.SetStatusFlag(StatusFlags.Overflow, ((value ^ CurrentState.A) & (value ^ operand) & 0x0080) > 0);
+            CurrentState.P_Negative = ((value & 0x0080) > 0);
+            CurrentState.P_Zero = ((value & 0x00FF) == 0);
+            CurrentState.P_Carry = ((value & 0xFF00) == 0);
+            CurrentState.P_Overflow = (((value ^ CurrentState.A) & (value ^ operand) & 0x0080) > 0);
 
             CurrentState.A = (byte)(value & 0x00FF);
         }
@@ -675,6 +675,16 @@ namespace NesSharp.CPU
 
         #region Compares
 
+        private void Compares(AddressingMode mode, byte register)
+        {
+            var operand = FetchOperandByte(mode);
+
+            var value = (byte)(register - operand);
+
+            UpdateNZFlags(value);
+            CurrentState.P_Carry = (register >= value);
+        }
+
         [Opcode(0xC9, "CMP", 2, AddressingMode.Immediate)]
         [Opcode(0xC5, "CMP", 3, AddressingMode.ZeroPage)]
         [Opcode(0xD5, "CMP", 4, AddressingMode.ZeroPageX)]
@@ -685,13 +695,7 @@ namespace NesSharp.CPU
         [Opcode(0xD1, "CMP", 5, AddressingMode.IndirectY)]
         private void Operation_CMP(AddressingMode mode)
         {
-            var operand = FetchOperandByte(mode);
-
-            var value = (ushort)(CurrentState.A - operand);
-
-            CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x0080) > 0);
-            CurrentState.SetStatusFlag(StatusFlags.Zero, CurrentState.A == (value & 0x00FF));
-            CurrentState.SetStatusFlag(StatusFlags.Carry, CurrentState.A >= (value & 0x00FF));
+            Compares(mode, CurrentState.A);
         }
 
         [Opcode(0xE0, "CPX", 2, AddressingMode.Immediate)]
@@ -699,13 +703,7 @@ namespace NesSharp.CPU
         [Opcode(0xEC, "CPX", 4, AddressingMode.Absolute)]
         private void Operation_CPX(AddressingMode mode)
         {
-            var operand = FetchOperandByte(mode);
-
-            var value = (ushort)(CurrentState.X - operand);
-
-            CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x0080) > 0);
-            CurrentState.SetStatusFlag(StatusFlags.Zero, CurrentState.X == (value & 0x00FF));
-            CurrentState.SetStatusFlag(StatusFlags.Carry, CurrentState.X >= (value & 0x00FF));
+            Compares(mode, CurrentState.X);
         }
 
         [Opcode(0xC0, "CPY", 2, AddressingMode.Immediate)]
@@ -713,13 +711,7 @@ namespace NesSharp.CPU
         [Opcode(0xCC, "CPY", 4, AddressingMode.Absolute)]
         private void Operation_CPY(AddressingMode mode)
         {
-            var operand = FetchOperandByte(mode);
-
-            var value = (ushort)(CurrentState.Y - operand);
-
-            CurrentState.SetStatusFlag(StatusFlags.Negative, (value & 0x0080) > 0);
-            CurrentState.SetStatusFlag(StatusFlags.Zero, CurrentState.Y == (value & 0x00FF));
-            CurrentState.SetStatusFlag(StatusFlags.Carry, CurrentState.Y >= (value & 0x00FF));
+            Compares(mode, CurrentState.Y);
         }
 
         [Opcode(0x24, "BIT", 3, AddressingMode.ZeroPage)]
@@ -730,9 +722,9 @@ namespace NesSharp.CPU
 
             var value = (byte)(CurrentState.A & operand);
 
-            CurrentState.SetStatusFlag(StatusFlags.Negative, (operand & 0x80) > 0);
-            CurrentState.SetStatusFlag(StatusFlags.Zero, value == 0x0);
-            CurrentState.SetStatusFlag(StatusFlags.Overflow, (operand & 0x40) > 0);
+            CurrentState.P_Negative = ((operand & 0x80) > 0);
+            CurrentState.P_Zero = ((value) == 0x0);
+            CurrentState.P_Overflow = ((operand & 0x40) > 0);
         }
 
         [Opcode(0xE6, "INC", 5, AddressingMode.ZeroPage)]
@@ -810,7 +802,7 @@ namespace NesSharp.CPU
 
             var result = (byte)(operand << 1);
             UpdateNZFlags(result);
-            CurrentState.SetStatusFlag(StatusFlags.Carry, ((operand & 0x80) > 0));
+            CurrentState.P_Carry = ((operand & 0x80) > 0);
 
             WriteOperand(mode, address, result);
         }
@@ -826,7 +818,7 @@ namespace NesSharp.CPU
 
             var result = (byte)(operand >> 1);
             UpdateNZFlags(result);
-            CurrentState.SetStatusFlag(StatusFlags.Carry, ((operand & 0x1) > 0));
+            CurrentState.P_Carry = ((operand & 0x1) > 0);
 
             WriteOperand(mode, address, result);
         }
@@ -840,10 +832,10 @@ namespace NesSharp.CPU
         {
             var (address, operand) = FetchOperand(mode, true);
 
-            var carry = CurrentState.GetStatusFlag(StatusFlags.Carry) ? 1 : 0;
+            var carry = CurrentState.P_Carry ? 1 : 0;
             var result = (byte)((operand << 1) | carry);
             UpdateNZFlags(result);
-            CurrentState.SetStatusFlag(StatusFlags.Carry, ((operand & 0x80) > 0));
+            CurrentState.P_Carry = ((operand & 0x80) > 0);
 
             WriteOperand(mode, address, result);
         }
@@ -857,10 +849,10 @@ namespace NesSharp.CPU
         {
             var (address, operand) = FetchOperand(mode, true);
 
-            var carry = CurrentState.GetStatusFlag(StatusFlags.Carry) ? 1 : 0;
+            var carry = CurrentState.P_Carry ? 1 : 0;
             var result = (byte)((operand >> 1) | (carry << 7));
             UpdateNZFlags(result);
-            CurrentState.SetStatusFlag(StatusFlags.Carry, ((operand & 0x1) > 0));
+            CurrentState.P_Carry = ((operand & 0x1) > 0);
 
             WriteOperand(mode, address, result);
         }
@@ -942,7 +934,8 @@ namespace NesSharp.CPU
         {
             var offset = FetchOperandRelative();
 
-            if (CurrentState.GetStatusFlag(flag) == expected)
+            var flagState = ((CurrentState.P & (byte)flag) > 0);
+            if (flagState == expected)
             {
                 currentCycleCost++;
 
@@ -1022,7 +1015,7 @@ namespace NesSharp.CPU
                 var statusRegister = CurrentState.P;
                 if (mode == InterruptMode.Break)
                 {
-                    statusRegister = (byte)(statusRegister | ((byte)StatusFlagBytes.Break));
+                    statusRegister = (byte)(statusRegister | ((byte)StatusFlags.Break));
                 }
                 StackPush(statusRegister);
             }
@@ -1034,7 +1027,7 @@ namespace NesSharp.CPU
             }
 
             // Set the interrupt flag
-            CurrentState.SetStatusFlag(StatusFlags.Interrupt, true);
+            CurrentState.P_Interrupt = true;
 
             // Jump
             JumpWithVectorTable(FixedJumpVector.BRK);
@@ -1061,43 +1054,43 @@ namespace NesSharp.CPU
         [Opcode(0x38, "SEC", 2)]
         private void Operation_SEC(AddressingMode mode)
         {
-            CurrentState.SetStatusFlag(StatusFlags.Carry, true);
+            CurrentState.P_Carry = true;
         }
 
         [Opcode(0x18, "CLC", 2)]
         private void Operation_CLC(AddressingMode mode)
         {
-            CurrentState.SetStatusFlag(StatusFlags.Carry, false);
+            CurrentState.P_Carry = false;
         }
 
         [Opcode(0xF8, "SED", 2)]
         private void Operation_SED(AddressingMode mode)
         {
-            CurrentState.SetStatusFlag(StatusFlags.Decimal, true);
+            CurrentState.P_Decimal = true;
         }
 
         [Opcode(0xD8, "CLD", 2)]
         private void Operation_CLD(AddressingMode mode)
         {
-            CurrentState.SetStatusFlag(StatusFlags.Decimal, false);
+            CurrentState.P_Decimal = false;
         }
 
         [Opcode(0x78, "SEI", 2)]
         private void Operation_SEI(AddressingMode mode)
         {
-            CurrentState.SetStatusFlag(StatusFlags.Interrupt, true);
+            CurrentState.P_Interrupt = true;
         }
 
         [Opcode(0x58, "CLI", 2)]
         private void Operation_CLI(AddressingMode mode)
         {
-            CurrentState.SetStatusFlag(StatusFlags.Interrupt, false);
+            CurrentState.P_Interrupt = false;
         }
 
         [Opcode(0xB8, "CLV", 2)]
         private void Operation_CLV(AddressingMode mode)
         {
-            CurrentState.SetStatusFlag(StatusFlags.Overflow, false);
+            CurrentState.P_Overflow = false;
         }
 
         [Opcode(0xEA, "NOP", 2)]

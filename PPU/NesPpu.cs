@@ -407,7 +407,7 @@ namespace NesSharp.PPU
                 // Render sprites
                 if (Mask.ShowSprites && !(!Mask.ShowSpritesLeft && x < 8))
                 {
-                    for (byte i = 7; i >= 0; i--)
+                    for (byte i = 7; i > 0; i--)
                     {
                         if (OAM1[i].ID == 64)
                         {

@@ -219,14 +219,12 @@ namespace NesSharp.PPU
 
         private bool FastRead(byte i)
         {
-            return FastBits.Get(registerValue)[i];
+            return FastBits.Get(registerValue)[7 - i];
         }
 
         private void FastWrite(byte i, bool value)
         {
-            var updated = FastBits.Get(registerValue);
-            updated[i] = value;
-            registerValue = FastBits.Write(updated);
+            registerValue = FastBits.Set(registerValue, (byte)(7 - i), value);
         }
 
         public static implicit operator byte(MaskRegisterValues r) => r.registerValue;

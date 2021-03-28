@@ -29,6 +29,11 @@ namespace NesSharp.Utils
             return PRECOMPILED[b];
         }
 
+        public static byte Set(byte b, byte i, bool value)
+        {
+            return (byte)(b & ((value ? 1 : 0) << i));
+        }
+
         public static byte Write(bool[] bits)
         {
             return (byte)(
